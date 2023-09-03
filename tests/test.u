@@ -1,0 +1,23 @@
+export add;
+export add2;
+export echo;
+export big;
+export nop;
+
+add := fn a: i32, b: i32 -> i32 {
+    return a + b;
+};
+
+add2 := fn x: i32 -> i32 {
+    return x + 2;
+};
+
+echo := fn x: i32 -> i32 {
+    return x;
+};
+
+big := fn -> i32 {
+    return 123456789;
+};
+
+nop := fn {};
