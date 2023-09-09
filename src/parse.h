@@ -1,6 +1,8 @@
 #ifndef PARSE_H_
 #define PARSE_H_
 
+#include <stdbool.h>
+
 #include "da.h"
 #include "lex.h"
 
@@ -18,6 +20,7 @@ typedef struct {
 
 typedef enum {
     DK_FUNCTION,
+    DK_PARAM,
     DK_VARIABLE,
 } DeclKind;
 
@@ -35,6 +38,7 @@ typedef struct {
 typedef struct {
     da_list(Decl);
     size_t parent;
+    bool param_scope;
 } DeclScope;
 
 typedef struct {
@@ -51,6 +55,7 @@ typedef enum {
 
 typedef enum {
     OP_ADDITION,
+    OP_ASSIGNEMENT,
 } OperatorKind;
 
 typedef struct {
@@ -73,12 +78,18 @@ typedef enum {
     SK_EMPTY,
     SK_BLOCK,
     SK_RETURN,
+    SK_EXPRESSION,
 } StatementKind;
 
 typedef struct {
     StatementKind kind;
     Expression expr;
 } ReturnStatement;
+
+typedef struct {
+    StatementKind kind;
+    Expression expr;
+} ExpressionStatement;
 
 typedef union Statement {
     StatementKind kind;
@@ -88,6 +99,7 @@ typedef union Statement {
         da_list(union Statement);
     } block;
     ReturnStatement ret;
+    ExpressionStatement expr;
 } Statement;
 
 typedef struct BlockStatement BlockStatement;

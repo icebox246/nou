@@ -14,6 +14,7 @@ typedef enum {
     T_COMMA,
     T_ARROW,
     T_DECLARE,
+    T_ASSIGN,
     T_MINUS,
     T_PLUS,
     T_OPEN_BRACKETS,

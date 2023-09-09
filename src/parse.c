@@ -25,7 +25,13 @@ bool parse_function_type(Parser* p, Function* f) {
     assert(p->lex->token == KW_FN);
 
     f->param_scope = p->mod->scopes.count;
-    da_append(p->mod->scopes, (DeclScope){.parent = p->current_scope});
+    {
+        DeclScope scope = {
+            .parent = p->current_scope,
+            .param_scope = true,
+        };
+        da_append(p->mod->scopes, scope);
+    }
 
     Token token;
     while ((token = lexer_next_token(p->lex)) != T_ARROW &&
@@ -36,7 +42,7 @@ bool parse_function_type(Parser* p, Function* f) {
         }
         Decl param = {0};
         param.name = strndup(p->lex->token_text, p->lex->token_len);
-        param.kind = DK_VARIABLE;
+        param.kind = DK_PARAM;
 
         token = lexer_next_token(p->lex);
 
@@ -109,6 +115,9 @@ bool parse_expression(Parser* p, Expression* ex, Token terminator) {
                             // unique way
                 da_append(op_stack, (Op){.op = OP_ADDITION});
             } break;
+            case T_ASSIGN: {  
+                da_append(op_stack, (Op){.op = OP_ASSIGNEMENT});
+            } break;
             case T_INT: {  // TODO should all int consts be treated as i32?
                 Expr e = {0};
                 e.kind = EK_I32_CONST;
@@ -116,7 +125,8 @@ bool parse_expression(Parser* p, Expression* ex, Token terminator) {
                 da_append(*ex, e);
             } break;
             default:
-                fprintf(stderr, "Unexpected token in expression %d!\n", token);
+                fprintf(stderr, "Unexpected token in expression %d: `%.*s`!\n",
+                        token, (int)p->lex->token_len, p->lex->token_text);
                 return false;
         }
     }
@@ -155,9 +165,14 @@ bool parse_decl_statement(Parser* p, char* decl_name) {
             d.value = p->mod->functions.count;
             da_append(p->mod->functions, f);
         } break;
-        default:
-            fprintf(stderr, "Unexpected token in decl statement %d!\n", token);
-            return false;
+        default: {  // try to parse variable type
+            lexer_undo_token(p->lex);
+            d.kind = DK_VARIABLE;
+            if (!parse_value_type(p, (ValueType*)&d.value)) {
+                fprintf(stderr, "Failed to parse variable type!\n");
+                return false;
+            }
+        }
     }
 
     token = lexer_next_token(p->lex);
@@ -237,6 +252,25 @@ bool parse_return_statement(Parser* p, ReturnStatement* st) {
     return true;
 }
 
+bool parse_expr_statement(Parser* p, ExpressionStatement* st) {
+    st->kind = SK_EXPRESSION;
+    if (!parse_expression(p, &st->expr, T_SEMICOLON)) {
+        fprintf(stderr,
+                "Failed to parse expression in expression statement!\n");
+        return false;
+    }
+
+    Token token = lexer_next_token(p->lex);
+    if (token != T_SEMICOLON) {
+        fprintf(stderr,
+                "Expected semicolon after expression statement, got %d!\n",
+                token);
+        return false;
+    }
+
+    return true;
+}
+
 bool parse_statement(Parser* p, Statement* st) {
     st->kind = SK_EMPTY;
 
@@ -255,10 +289,28 @@ bool parse_statement(Parser* p, Statement* st) {
             }
             break;
         case T_SEMICOLON:
-            // TODO warn about extreanous semicolon
             fprintf(stderr, "WARN:%zu:%zu: Extreanous semicolon!\n",
                     p->lex->token_start_loc.line, p->lex->token_start_loc.col);
             break;
+        case T_IDENT: {
+            Lexer backup = *p->lex;
+            char* name = strndup(p->lex->token_text, p->lex->token_len);
+            if (lexer_next_token(p->lex) == T_DECLARE) {
+                *p->lex = backup;
+                if (!parse_decl_statement(p, name)) {
+                    fprintf(stderr, "Failed to parse local decl statement!\n");
+                    return false;
+                }
+            } else {
+                free(name);
+                *p->lex = backup;
+                lexer_undo_token(p->lex);
+                if (!parse_expr_statement(p, &st->expr)) {
+                    fprintf(stderr, "Failed to parse expr statement!\n");
+                    return false;
+                }
+            }
+        } break;
         default:
             fprintf(stderr, "Unexpected at beginning of statement %d: %.*s!\n",
                     token, (int)p->lex->token_len, p->lex->token_text);

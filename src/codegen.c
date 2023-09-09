@@ -36,6 +36,16 @@ typedef struct {
     ByteBuffer output_buffer;
 } Generator;
 
+typedef struct {
+    bool take_reference;
+    ValueType left_type;
+    ValueType right_type;
+} ExprDecision;
+
+typedef struct {
+    da_list(ExprDecision);
+} ExprDecisions;
+
 static Decl* find_global_decl(Module* mod, const char* name) {
     DeclScope* s = &mod->scopes.items[0];
 
@@ -107,27 +117,66 @@ ByteBuffer codegen_value_type(Module* mod, ValueType vt) {
     assert(false && "Unreachable");
 }
 
+size_t get_size_of_value_type(Module* mod, ValueType vt) {
+    switch (vt) {
+        case VT_NIL:
+            return 0;
+        case VT_I32:
+            return 4;
+    }
+}
+
 // expressions
 
-bool find_var_local_index(Module* mod, size_t scope, char* name,
-                          size_t* out_index) {
+bool find_local_var(Module* mod, size_t scope, char* name, size_t* out_index,
+                    Decl** out_decl) {
     if (out_index) *out_index = 0;
     DeclScope* s = &mod->scopes.items[scope];
 
     if (scope != 0) {
-        if (find_var_local_index(mod, s->parent, name, out_index)) return true;
+        if (find_local_var(mod, s->parent, name, out_index, out_decl))
+            return true;
     }
 
+    size_t param_index = 0;
     for (size_t i = 0; i < s->count; i++) {
         Decl* decl = &s->items[i];
-        if (strcmp(decl->name, name) == 0) return true;
-        if (out_index && decl->kind == DK_VARIABLE) ++*out_index;
+        if (strcmp(decl->name, name) == 0) {
+            if (decl->kind == DK_PARAM && out_index) *out_index = param_index;
+            if (out_decl) *out_decl = decl;
+            return true;
+        }
+        if (decl->kind == DK_PARAM) param_index++;
+        if (out_index && decl->kind == DK_VARIABLE)
+            *out_index += get_size_of_value_type(mod, decl->value);
     }
 
     return false;
 }
 
-ByteBuffer codegen_expr(Module* mod, Expr* ex, size_t scope) {
+bool find_stack_base_index(Module* mod, size_t scope, size_t* out_index) {
+    if (scope == 0) return false;
+    const DeclScope* s = &mod->scopes.items[scope];
+    if (s->param_scope) {
+        if (out_index)
+            *out_index = s->count;  // asserts that stack base is the first
+                                    // local after params
+        return true;
+    }
+    return find_stack_base_index(mod, s->parent, out_index);
+}
+
+bool find_temp_i32_index(Module* mod, size_t scope, size_t* out_index) {
+    if (find_stack_base_index(mod, scope, out_index)) {
+        if (out_index)
+            *out_index += 1;  // asserts that temp_i32 is next after stack_base
+        return true;
+    }
+    return false;
+}
+
+ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
+                        size_t scope) {
     ByteBuffer e = {0};
     switch (ex->kind) {
         case EK_I32_CONST:
@@ -135,16 +184,52 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, size_t scope) {
             bb_append_leb128_u(&e, ex->props.i32);  // TODO make it signed
             break;
         case EK_VAR: {
-            da_append(e, 0x20);  // opcode for local.get
             size_t var_index;
-            if (!find_var_local_index(mod, scope, ex->props.var, &var_index)) {
-                // TODO probably function local variables should be stored in
-                // linear memory
+            Decl* var_decl;
+            if (!find_local_var(mod, scope, ex->props.var, &var_index,
+                                &var_decl)) {
                 fprintf(stderr, "Can't find `%s` used in expr\n",
                         ex->props.var);
                 exit(1);
             }
-            bb_append_leb128_u(&e, var_index);
+            switch (var_decl->kind) {
+                case DK_FUNCTION:
+                    assert(false && "Unimplemented");
+                    break;
+                case DK_PARAM:
+                    assert(!decision.take_reference &&
+                           "Cannot take reference to a parameter");
+                    da_append(e, 0x20);  // opcode for local.get
+                    bb_append_leb128_u(&e, var_index);
+                    break;
+                case DK_VARIABLE: {
+                    size_t stack_base_index;
+                    if (!find_stack_base_index(mod, scope, &stack_base_index)) {
+                        assert(false &&
+                               "Failed to find stack_base, likely expression "
+                               "is not in a function scope");
+                    }
+                    if (decision.take_reference) {
+                        da_append(e, 0x20);  // opcode for local.get
+                        bb_append_leb128_u(&e, stack_base_index);
+
+                        if (var_index) {
+                            da_append(e, 0x41);  // opcode for i32.const
+                            bb_append_leb128_u(&e, var_index);  // offset
+                            da_append(e, 0x6A);  // opcode for i32.add
+                        }
+                    } else {
+                        da_append(e, 0x20);  // opcode for local.get
+                        bb_append_leb128_u(&e, stack_base_index);
+
+                        assert(var_decl->value == VT_I32 &&
+                               "Only i32 variables are supported now");
+                        da_append(e, 0x28);         // opcode for i32.load
+                        bb_append_leb128_u(&e, 0);  // align
+                        bb_append_leb128_u(&e, var_index);  // offset
+                    }
+                } break;
+            }
         } break;
         case EK_OPERATOR: {
             switch (ex->props.op) {
@@ -152,6 +237,22 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, size_t scope) {
                                    // be codegenned base on type stack
                     da_append(e, 0x6A);  // opcode for i32.add
                     break;
+                case OP_ASSIGNEMENT: {  // TODO figure out which instruction
+                                        // should be codegenned base on type
+                                        // stack
+                    size_t temp_i32_index;
+                    assert(find_temp_i32_index(mod, scope, &temp_i32_index));
+
+                    da_append(e, 0x22);  // opcode for local.tee
+                    bb_append_leb128_u(&e, temp_i32_index);
+
+                    da_append(e, 0x36);  // opcode for i32.store
+                    bb_append_leb128_u(&e, 0);
+                    bb_append_leb128_u(&e, 0);
+
+                    da_append(e, 0x20);  // opcode for local.get
+                    bb_append_leb128_u(&e, temp_i32_index);
+                } break;
             }
         } break;
     }
@@ -159,14 +260,89 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, size_t scope) {
     return e;
 }
 
-ByteBuffer codegen_expression(Module* mod, Expression* expr, size_t scope) {
-    // TODO add type stack to type check expression
+ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
+                                           size_t scope,
+                                           size_t* out_remaining_count) {
+    enum {
+        temp_index = -1,
+    };
+    struct {
+        da_list(size_t);
+    } index_stack = {0};
+    struct {
+        da_list(ValueType);
+    } type_stack = {0};
+    ExprDecisions decisions = {0};
+
+    for (size_t i = 0; i < expr->count; i++) {
+        ExprDecision decision = {0};
+        Expr* e = &expr->items[i];
+
+        switch (e->kind) {
+            case EK_I32_CONST: {
+                da_append(index_stack, temp_index);
+                da_append(type_stack, VT_I32);
+            } break;
+            case EK_VAR: {
+                Decl* decl;
+                assert(find_local_var(mod, scope, e->props.var, NULL, &decl) &&
+                       "Use of undeclared variable");
+                da_append(index_stack, i);
+                da_append(type_stack, decl->value);
+            } break;
+            case EK_OPERATOR: {
+                assert(index_stack.count >= 2 &&
+                       "Wrong amount of operands for binary op");
+                size_t li = index_stack.items[index_stack.count - 2];
+                size_t ri = index_stack.items[index_stack.count - 1];
+                decision.left_type = type_stack.items[index_stack.count - 2];
+                decision.right_type = type_stack.items[index_stack.count - 1];
+                switch (e->props.op) {
+                    case OP_ADDITION: {
+                        index_stack.count -= 2;
+                        type_stack.count -= 2;
+
+                        da_append(index_stack, temp_index);
+                        da_append(
+                            type_stack,
+                            decision.left_type);  // TODO maybe there should be
+                                                  // a smarter system for that
+                    } break;
+                    case OP_ASSIGNEMENT: {
+                        index_stack.count -= 2;
+                        type_stack.count -= 2;
+                        assert(li != temp_index &&
+                               "Cannot assign to temporary value");
+                        decisions.items[li].take_reference = true;
+
+                        da_append(index_stack, temp_index);
+                        da_append(type_stack, decision.left_type);
+                    } break;
+                }
+            } break;
+        }
+        da_append(decisions, decision);
+    }
+
+    if (out_remaining_count) *out_remaining_count = type_stack.count;
+
+    free(index_stack.items);
+    free(type_stack.items);
+    return decisions;
+}
+
+ByteBuffer codegen_expression(Module* mod, Expression* expr, size_t scope,
+                              size_t* out_remaining_count) {
+    ExprDecisions decisions =
+        compute_expression_decisions(mod, expr, scope, out_remaining_count);
     ByteBuffer out = {0};
     for (size_t i = 0; i < expr->count; i++) {
-        ByteBuffer e = codegen_expr(mod, &expr->items[i], scope);
+        ByteBuffer e =
+            codegen_expr(mod, &expr->items[i], decisions.items[i], scope);
         bb_append_bb(&out, &e);
         free(e.items);
     }
+    free(decisions.items);
     return out;
 }
 
@@ -187,9 +363,21 @@ ByteBuffer codegen_block_statement(Module* mod, BlockStatement* st,
 
 ByteBuffer codegen_return_statement(Module* mod, ReturnStatement* st,
                                     size_t scope) {
-    ByteBuffer ret = codegen_expression(mod, &st->expr, scope);
+    // TODO make sure correct value gets returned
+    ByteBuffer ret = codegen_expression(mod, &st->expr, scope, NULL);
     da_append(ret, 0x0F);  // return op code
     return ret;
+}
+
+ByteBuffer codegen_expr_statement(Module* mod, ExpressionStatement* st,
+                                  size_t scope) {
+    size_t drop_count;
+    ByteBuffer ex = codegen_expression(mod, &st->expr, scope, &drop_count);
+    while (drop_count) {
+        drop_count--;
+        da_append(ex, 0x1A);  // opcode for drop
+    }
+    return ex;
 }
 
 ByteBuffer codegen_statement(Module* mod, Statement* st, size_t scope) {
@@ -200,19 +388,26 @@ ByteBuffer codegen_statement(Module* mod, Statement* st, size_t scope) {
             return codegen_block_statement(mod, &st->block, scope);
         case SK_RETURN:
             return codegen_return_statement(mod, &st->ret, scope);
+        case SK_EXPRESSION:
+            return codegen_expr_statement(mod, &st->expr, scope);
     }
 }
 
 // functions
 
 Vec codegen_function_locals(Module* mod, Function* f) {
-    // TODO this is just a stub, because currently there is no use for locals
     Vec locals = {0};
+    {  // stack_base and temp_i32
+        ByteBuffer stack_base_local_buf = {0};
+        bb_append_leb128_u(&stack_base_local_buf, 2);
+        da_append(stack_base_local_buf, 0x7F);  // i32
+        vec_append_elem(&locals, &stack_base_local_buf);
+        free(stack_base_local_buf.items);
+    }
     return locals;
 }
 
 ByteBuffer codegen_function_expr(Module* mod, Function* f) {
-    // TODO this is just a stub, because statement codegen is not implemented
     ByteBuffer expr = codegen_statement(mod, &f->content, f->param_scope);
     da_append(expr, 0x0B);  // end opcode
     return expr;
@@ -225,6 +420,18 @@ ByteBuffer codegen_function(Module* mod, Function* f) {
         Vec locals = codegen_function_locals(mod, f);
         bb_append_vec(&code, &locals);
         free(locals.content.items);
+    }
+
+    {
+        size_t stack_base_index;
+        assert(find_stack_base_index(mod, f->param_scope, &stack_base_index) &&
+               "Function param scope must be a param_scope...");
+
+        da_append(code, 0x41);  // opcode for i32.const
+        bb_append_leb128_u(&code, 0);
+
+        da_append(code, 0x21);  // opcode for local.set
+        bb_append_leb128_u(&code, stack_base_index);
     }
 
     {
@@ -255,7 +462,7 @@ Section codegen_types(Module* mod) {
             Vec param_types = {0};
 
             for (size_t j = 0; j < param_scope->count; j++) {
-                assert(param_scope->items[j].kind == DK_VARIABLE);
+                assert(param_scope->items[j].kind == DK_PARAM);
                 ByteBuffer param_type =
                     codegen_value_type(mod, param_scope->items[j].value);
 
@@ -311,6 +518,25 @@ Section codegen_funcs(Module* mod) {
     free(funcs.content.items);
 
     return func_section;
+}
+
+Section codegen_mem(Module* mod) {
+    Section mem_section = {.id = SID_MEMORY};
+
+    Vec mems = {0};
+
+    {
+        ByteBuffer memory0 = {0};
+        da_append(memory0, 0x00);  // limit: min..
+        bb_append_leb128_u(&memory0, 1);
+        vec_append_elem(&mems, &memory0);
+        free(memory0.items);
+    }
+
+    bb_append_vec(&mem_section.content, &mems);
+    free(mems.content.items);
+
+    return mem_section;
 }
 
 Section codegen_exports(Module* mod) {
@@ -380,6 +606,12 @@ ByteBuffer codegen_module(Module* mod) {
         Section funcs_section = codegen_funcs(mod);
         bb_append_section(&gen.output_buffer, &funcs_section);
         free(funcs_section.content.items);
+    }
+
+    {  // mem
+        Section mem_section = codegen_mem(mod);
+        bb_append_section(&gen.output_buffer, &mem_section);
+        free(mem_section.content.items);
     }
 
     {  // exports

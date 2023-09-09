@@ -93,7 +93,7 @@ Token lexer_next_token(Lexer* lexer) {
                 return lexer->token = T_SEMICOLON;
             case '=':
                 lexer_consume_char(lexer);
-                return lexer->token = T_EQUAL;
+                return lexer->token = T_ASSIGN;
             case ',':
                 lexer_consume_char(lexer);
                 return lexer->token = T_COMMA;

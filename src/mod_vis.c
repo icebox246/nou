@@ -46,6 +46,9 @@ void visualize_expr(Expr* e, Visualizer* v) {
                 case OP_ADDITION:
                     fprintf(v->file, "+");
                     break;
+                case OP_ASSIGNEMENT:
+                    fprintf(v->file, "=");
+                    break;
             }
             fprintf(v->file, "\n");
             break;
@@ -99,6 +102,18 @@ void visualize_return_statement(ReturnStatement* s, Visualizer* v) {
     fprintf(v->file, "}\n");
 }
 
+void visualize_expr_statement(ReturnStatement* s, Visualizer* v) {
+    vis_write_indent(v);
+    fprintf(v->file, "expr {\n");
+
+    v->indent++;
+    visualize_expression(&s->expr, v);
+    v->indent--;
+
+    vis_write_indent(v);
+    fprintf(v->file, "}\n");
+}
+
 void visualize_statement(Statement* s, Visualizer* v) {
     switch (s->kind) {
         case SK_EMPTY:
@@ -108,6 +123,9 @@ void visualize_statement(Statement* s, Visualizer* v) {
             break;
         case SK_RETURN:
             visualize_return_statement(&s->ret, v);
+            break;
+        case SK_EXPRESSION:
+            visualize_expr_statement(&s->ret, v);
             break;
     }
 }
@@ -143,6 +161,10 @@ void visualize_decl(Decl* decl, Visualizer* v) {
     switch (decl->kind) {
         case DK_FUNCTION:
             fprintf(v->file, "%s := fn #%zu", decl->name, decl->value);
+            break;
+        case DK_PARAM:
+            fprintf(v->file, "%s := param ", decl->name);
+            visualize_value_type(decl->value, v);
             break;
         case DK_VARIABLE:
             fprintf(v->file, "%s := var ", decl->name);

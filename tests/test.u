@@ -3,6 +3,7 @@ export add2;
 export echo;
 export big;
 export nop;
+export variables;
 
 add := fn a: i32, b: i32 -> i32 {
     return a + b;
@@ -21,3 +22,9 @@ big := fn -> i32 {
 };
 
 nop := fn {};
+
+variables := fn -> i32 {
+    a := i32; 
+    a = 21 + 21;
+    return a;
+};
