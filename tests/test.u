@@ -6,6 +6,7 @@ export nop;
 export variables;
 export expressions;
 export expressions2;
+export functions;
 
 add := fn a: i32, b: i32 -> i32 {
     return a + b;
@@ -42,5 +43,16 @@ expressions := fn -> i32 {
 expressions2 := fn -> i32 {
     a := i32; 
     a = 2 * (20 + 1);
+    return a;
+};
+
+functions := fn -> i32 {
+    a := i32;
+    f := fn {
+        t := i32;
+        t = 42;
+    };
+    a = add(20, 21); 
+    f();
     return a;
 };

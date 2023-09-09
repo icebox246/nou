@@ -93,7 +93,8 @@ size_t operator_precedence(OperatorKind op) {
             return 1;
 
         case OP_OPEN_PAREN:
-            return 0;
+        case OP_FUNC_CALL:
+            assert(false && "Unreachable");
     }
 }
 
@@ -113,7 +114,8 @@ size_t operator_associativity(OperatorKind op) {
             return OPA_RIGHT;
 
         case OP_OPEN_PAREN:
-            return 0;
+        case OP_FUNC_CALL:
+            assert(false && "Unreachable");
     }
 }
 
@@ -136,6 +138,9 @@ bool parse_expression(Parser* p, Expression* ex, Token terminator) {
     struct {
         da_list(OperatorKind);
     } op_stack = {0};
+    struct {
+        da_list(char*);
+    } func_name_stack = {0};
 
     while (true) {
         Token token = lexer_next_token(p->lex);
@@ -151,6 +156,7 @@ bool parse_expression(Parser* p, Expression* ex, Token terminator) {
                 op_stack.count--;
             }
             free(op_stack.items);
+            free(func_name_stack.items);
             return true;
         }
         {
@@ -181,7 +187,11 @@ bool parse_expression(Parser* p, Expression* ex, Token terminator) {
                 da_append(op_stack, OP_OPEN_PAREN);
             } break;
             case T_CLOSE_PARENS: {
-                do {
+                if (op_stack.count == 0) {
+                    fprintf(stderr, "Mismatched parenthesis!\n");
+                    return false;
+                }
+                while (op_stack.items[op_stack.count - 1] != OP_OPEN_PAREN) {
                     if (op_stack.count == 0) {
                         fprintf(stderr, "Mismatched parenthesis!\n");
                         return false;
@@ -192,24 +202,58 @@ bool parse_expression(Parser* p, Expression* ex, Token terminator) {
                     };
                     da_append(*ex, e);
                     op_stack.count--;
-                } while (op_stack.items[op_stack.count - 1] != OP_OPEN_PAREN);
+                }
 
                 assert(op_stack.items[op_stack.count - 1] == OP_OPEN_PAREN);
                 op_stack.count--;
 
-                // TODO process top function call from function stack
+                if (op_stack.count &&
+                    op_stack.items[op_stack.count - 1] == OP_FUNC_CALL) {
+                    Expr e = {
+                        .kind = EK_FUNC_CALL,
+                        .props.var =
+                            func_name_stack.items[func_name_stack.count - 1],
+                    };
+                    da_append(*ex, e);
+
+                    op_stack.count--;
+                    func_name_stack.count--;
+                }
             } break;
-            case T_IDENT: {  // TODO check if it is not a function call
-                Expr e = {0};
-                e.kind = EK_VAR;
-                e.props.var = strndup(p->lex->token_text, p->lex->token_len);
-                da_append(*ex, e);
+            case T_IDENT: {
+                char* name = strndup(p->lex->token_text, p->lex->token_len);
+                if (lexer_next_token(p->lex) == T_OPEN_PARENS) {
+                    lexer_undo_token(p->lex);
+                    da_append(func_name_stack, name);
+                    da_append(op_stack, OP_FUNC_CALL);
+                } else {
+                    lexer_undo_token(p->lex);
+                    Expr e = {
+                        .kind = EK_VAR,
+                        .props.var = name,
+                    };
+                    da_append(*ex, e);
+                }
             } break;
             case T_INT: {  // TODO should all int consts be treated as i32?
-                Expr e = {0};
-                e.kind = EK_I32_CONST;
-                e.props.i32 = p->lex->token_int;
+                Expr e = {
+                    .kind = EK_I32_CONST,
+                    .props.i32 = p->lex->token_int,
+                };
                 da_append(*ex, e);
+            } break;
+            case T_COMMA: {
+                while (op_stack.count &&
+                       op_stack.items[op_stack.count - 1] != OP_OPEN_PAREN) {
+                    Expr e = {
+                        .kind = EK_OPERATOR,
+                        .props.op = op_stack.items[op_stack.count - 1],
+                    };
+                    fprintf(stderr, "FOO: %d\n",
+                            op_stack.items[op_stack.count - 1]);
+                    da_append(*ex, e);
+                    op_stack.count--;
+                }
             } break;
             default:
                 fprintf(stderr, "Unexpected token in expression %d: `%.*s`!\n",

@@ -45,16 +45,20 @@ Token lexer_next_token(Lexer* lexer) {
             lexer_consume_char(lexer);
         }
 
-        if (strncmp("fn", lexer->token_text, lexer->token_len) == 0) {
+        if (lexer->token_len == 2 &&
+            strncmp("fn", lexer->token_text, lexer->token_len) == 0) {
             return lexer->token = KW_FN;
         }
-        if (strncmp("export", lexer->token_text, lexer->token_len) == 0) {
+        if (lexer->token_len == 6 &&
+            strncmp("export", lexer->token_text, lexer->token_len) == 0) {
             return lexer->token = KW_EXPORT;
         }
-        if (strncmp("return", lexer->token_text, lexer->token_len) == 0) {
+        if (lexer->token_len == 6 &&
+            strncmp("return", lexer->token_text, lexer->token_len) == 0) {
             return lexer->token = KW_RETURN;
         }
-        if (strncmp("i32", lexer->token_text, lexer->token_len) == 0) {
+        if (lexer->token_len == 3 &&
+            strncmp("i32", lexer->token_text, lexer->token_len) == 0) {
             return lexer->token = KW_i32;
         }
 

@@ -51,6 +51,7 @@ typedef enum {
     EK_I32_CONST,
     EK_VAR,
     EK_OPERATOR,
+    EK_FUNC_CALL,
 } ExprKind;
 
 typedef enum {
@@ -59,6 +60,7 @@ typedef enum {
     OP_MULTIPLICATION,
     OP_ASSIGNEMENT,
     OP_OPEN_PAREN,
+    OP_FUNC_CALL,
 } OperatorKind;
 
 typedef struct {
@@ -67,6 +69,7 @@ typedef struct {
         int32_t i32;
         char* var;
         OperatorKind op;
+        char* func;
     } props;
 } Expr;
 

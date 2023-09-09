@@ -22,6 +22,10 @@ typedef enum {
     SID_DATA_COUNT,
 } SectionId;
 
+typedef enum {
+    GLOBAL_STACK_PTR,
+} BuiltinGlobals;
+
 typedef struct {
     SectionId id;
     ByteBuffer content;
@@ -154,6 +158,49 @@ bool find_local_var(Module* mod, size_t scope, char* name, size_t* out_index,
     return false;
 }
 
+bool find_local_fn(Module* mod, size_t scope, char* name, size_t* out_index) {
+    DeclScope* s = &mod->scopes.items[scope];
+
+    if (scope != 0) {
+        if (find_local_fn(mod, s->parent, name, out_index)) return true;
+    }
+
+    for (size_t i = 0; i < s->count; i++) {
+        Decl* decl = &s->items[i];
+        if (strcmp(decl->name, name) == 0) {
+            if (decl->kind == DK_FUNCTION) {
+                if (out_index) *out_index = decl->value;
+                return true;
+            }
+            return false;
+        }
+    }
+
+    return false;
+}
+
+bool calc_local_frame_size(Module* mod, size_t scope, size_t* out_size) {
+    if (out_size) *out_size = 0;
+    DeclScope* s = &mod->scopes.items[scope];
+
+    if (scope == 0) {
+        return false;
+    }
+
+    if (!s->param_scope) {
+        if (!calc_local_frame_size(mod, s->parent, out_size)) return false;
+    }
+
+    for (size_t i = 0; i < s->count; i++) {
+        Decl* decl = &s->items[i];
+        if (decl->kind == DK_VARIABLE) {
+            if (out_size) *out_size += get_size_of_value_type(mod, decl->value);
+        }
+    }
+
+    return true;
+}
+
 bool find_stack_base_index(Module* mod, size_t scope, size_t* out_index) {
     if (scope == 0) return false;
     const DeclScope* s = &mod->scopes.items[scope];
@@ -266,9 +313,30 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
                 } break;
 
                 case OP_OPEN_PAREN:
+                case OP_FUNC_CALL:
                     assert(false && "Unreachable");
-                    break;
             }
+        } break;
+        case EK_FUNC_CALL: {
+            size_t stack_base_index;
+            assert(find_stack_base_index(mod, scope, &stack_base_index));
+
+            size_t frame_size;
+            assert(calc_local_frame_size(mod, scope, &frame_size));
+
+            size_t fn_index;
+            assert(find_local_fn(mod, scope, ex->props.func, &fn_index));
+
+            da_append(e, 0x20);  // opcode for local.get
+            bb_append_leb128_u(&e, stack_base_index);
+            da_append(e, 0x41);  // opcode for i32.const
+            bb_append_leb128_u(&e, frame_size);
+            da_append(e, 0x6A);  // opcode for i32.add
+            da_append(e, 0x24);  // opcode for global.set
+            bb_append_leb128_u(&e, GLOBAL_STACK_PTR);
+
+            da_append(e, 0x10);  // opcode for call
+            bb_append_leb128_u(&e, fn_index);
         } break;
     }
 
@@ -337,8 +405,33 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
                     } break;
 
                     case OP_OPEN_PAREN:
+                    case OP_FUNC_CALL:
                         assert(false && "Unreachable");
                         break;
+                }
+            } break;
+            case EK_FUNC_CALL: {
+                size_t fn_index;
+                assert(find_local_fn(mod, scope, e->props.func, &fn_index) &&
+                       "Calling undefined function");
+                Function* f = &mod->functions.items[fn_index];
+                DeclScope* param_scope = &mod->scopes.items[f->param_scope];
+                size_t arity = param_scope->count;
+
+                assert(type_stack.count >= arity);
+
+                for (int i = 0; i < arity; i++) {
+                    if (type_stack.items[type_stack.count - arity + i] !=
+                        param_scope->items[i].value)
+                        assert(false && "Type mismatch in function arguments");
+                }
+
+                index_stack.count -= arity;
+                type_stack.count -= arity;
+
+                if (f->return_type != VT_NIL) {
+                    da_append(index_stack, temp_index);
+                    da_append(type_stack, f->return_type);
                 }
             } break;
         }
@@ -460,8 +553,8 @@ ByteBuffer codegen_function(Module* mod, Function* f) {
         assert(find_stack_base_index(mod, f->param_scope, &stack_base_index) &&
                "Function param scope must be a param_scope...");
 
-        da_append(code, 0x41);  // opcode for i32.const
-        bb_append_leb128_u(&code, 0);
+        da_append(code, 0x23);  // opcode for global.get
+        bb_append_leb128_u(&code, GLOBAL_STACK_PTR);
 
         da_append(code, 0x21);  // opcode for local.set
         bb_append_leb128_u(&code, stack_base_index);
@@ -572,6 +665,28 @@ Section codegen_mem(Module* mod) {
     return mem_section;
 }
 
+Section codegen_global(Module* mod) {
+    Section global_section = {.id = SID_GLOBAL};
+
+    Vec globals = {0};
+
+    {
+        ByteBuffer stack_ptr = {0};
+        da_append(stack_ptr, 0x7F);         // i32
+        da_append(stack_ptr, 0x01);         // mut
+        da_append(stack_ptr, 0x41);         // opcode for i32.const
+        bb_append_leb128_u(&stack_ptr, 0);  // 0
+        da_append(stack_ptr, 0xB);          // opcode for end
+        vec_append_elem(&globals, &stack_ptr);
+        free(stack_ptr.items);
+    }
+
+    bb_append_vec(&global_section.content, &globals);
+    free(globals.content.items);
+
+    return global_section;
+}
+
 Section codegen_exports(Module* mod) {
     Section export_section = {.id = SID_EXPORT};
 
@@ -645,6 +760,12 @@ ByteBuffer codegen_module(Module* mod) {
         Section mem_section = codegen_mem(mod);
         bb_append_section(&gen.output_buffer, &mem_section);
         free(mem_section.content.items);
+    }
+
+    {  // global
+        Section global_section = codegen_global(mod);
+        bb_append_section(&gen.output_buffer, &global_section);
+        free(global_section.content.items);
     }
 
     {  // exports

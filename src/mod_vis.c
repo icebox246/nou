@@ -57,10 +57,15 @@ void visualize_expr(Expr* e, Visualizer* v) {
                     break;
 
                 case OP_OPEN_PAREN:
+                case OP_FUNC_CALL:
                     assert(false && "Unreachable");
                     break;
             }
             fprintf(v->file, "\n");
+            break;
+        case EK_FUNC_CALL:
+            vis_write_indent(v);
+            fprintf(v->file, "call %s\n", e->props.func);
             break;
     }
 }
