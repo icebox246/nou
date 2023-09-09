@@ -277,7 +277,7 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
 
 ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
                                            size_t scope,
-                                           size_t* out_remaining_count) {
+                                           ValueType* out_remaining_value) {
     enum {
         temp_index = -1,
     };
@@ -345,7 +345,20 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
         da_append(decisions, decision);
     }
 
-    if (out_remaining_count) *out_remaining_count = type_stack.count;
+    if (out_remaining_value) {
+        switch (type_stack.count) {
+            case 1:
+                *out_remaining_value = *type_stack.items;
+                break;
+            case 0:
+                *out_remaining_value = VT_NIL;
+                break;
+            default:
+                assert(false &&
+                       "There must be a single remaining value after "
+                       "processing an expression");
+        }
+    }
 
     free(index_stack.items);
     free(type_stack.items);
@@ -353,9 +366,9 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
 }
 
 ByteBuffer codegen_expression(Module* mod, Expression* expr, size_t scope,
-                              size_t* out_remaining_count) {
+                              ValueType* out_remaining_value) {
     ExprDecisions decisions =
-        compute_expression_decisions(mod, expr, scope, out_remaining_count);
+        compute_expression_decisions(mod, expr, scope, out_remaining_value);
     ByteBuffer out = {0};
     for (size_t i = 0; i < expr->count; i++) {
         ByteBuffer e =
@@ -392,10 +405,9 @@ ByteBuffer codegen_return_statement(Module* mod, ReturnStatement* st,
 
 ByteBuffer codegen_expr_statement(Module* mod, ExpressionStatement* st,
                                   size_t scope) {
-    size_t drop_count;
-    ByteBuffer ex = codegen_expression(mod, &st->expr, scope, &drop_count);
-    while (drop_count) {
-        drop_count--;
+    ValueType drop_value;
+    ByteBuffer ex = codegen_expression(mod, &st->expr, scope, &drop_value);
+    if (drop_value != VT_NIL) {
         da_append(ex, 0x1A);  // opcode for drop
     }
     return ex;
