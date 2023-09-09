@@ -82,12 +82,59 @@ bool parse_function_type(Parser* p, Function* f) {
     return true;
 }
 
+size_t operator_precedence(OperatorKind op) {
+    switch (op) {
+        case OP_MULTIPLICATION:
+            return 3;
+        case OP_ADDITION:
+        case OP_SUBTRACTION:
+            return 2;
+        case OP_ASSIGNEMENT:
+            return 1;
+
+        case OP_OPEN_PAREN:
+            return 0;
+    }
+}
+
+typedef enum {
+    OPA_LEFT,
+    OPA_RIGHT,
+} OpAssociativity;
+
+size_t operator_associativity(OperatorKind op) {
+    switch (op) {
+        case OP_ADDITION:
+        case OP_SUBTRACTION:
+        case OP_MULTIPLICATION:
+            return OPA_LEFT;
+
+        case OP_ASSIGNEMENT:
+            return OPA_RIGHT;
+
+        case OP_OPEN_PAREN:
+            return 0;
+    }
+}
+
+OperatorKind operator_of_token(Token tok) {
+    switch (tok) {
+        case T_ASSIGN:
+            return OP_ASSIGNEMENT;
+        case T_MINUS:
+            return OP_SUBTRACTION;
+        case T_PLUS:
+            return OP_ADDITION;
+        case T_STAR:
+            return OP_MULTIPLICATION;
+        default:
+            return -1;
+    }
+}
+
 bool parse_expression(Parser* p, Expression* ex, Token terminator) {
-    typedef struct {
-        OperatorKind op;
-    } Op;
     struct {
-        da_list(Op);
+        da_list(OperatorKind);
     } op_stack = {0};
 
     while (true) {
@@ -95,28 +142,68 @@ bool parse_expression(Parser* p, Expression* ex, Token terminator) {
         if (token == terminator) {
             lexer_undo_token(p->lex);
             while (op_stack.count) {
-                Expr e = {0};
-                e.kind = EK_OPERATOR;
-                e.props.op = op_stack.items[op_stack.count - 1].op;
+                assert(op_stack.items[op_stack.count - 1] != OP_OPEN_PAREN);
+                Expr e = {
+                    .kind = EK_OPERATOR,
+                    .props.op = op_stack.items[op_stack.count - 1],
+                };
                 da_append(*ex, e);
                 op_stack.count--;
             }
             free(op_stack.items);
             return true;
         }
+        {
+            OperatorKind new_op = operator_of_token(token);
+            if (new_op != -1) {
+                OperatorKind top_op;
+                while (op_stack.count &&
+                       (top_op = op_stack.items[op_stack.count - 1]) !=
+                           OP_OPEN_PAREN &&
+                       (operator_precedence(top_op) >
+                            operator_precedence(new_op) ||
+                        (operator_precedence(top_op) ==
+                             operator_precedence(new_op) &&
+                         operator_associativity(new_op) == OPA_LEFT))) {
+                    Expr e = {
+                        .kind = EK_OPERATOR,
+                        .props.op = op_stack.items[op_stack.count - 1],
+                    };
+                    da_append(*ex, e);
+                    op_stack.count--;
+                }
+                da_append(op_stack, new_op);
+                continue;
+            }
+        }
         switch (token) {
+            case T_OPEN_PARENS: {
+                da_append(op_stack, OP_OPEN_PAREN);
+            } break;
+            case T_CLOSE_PARENS: {
+                do {
+                    if (op_stack.count == 0) {
+                        fprintf(stderr, "Mismatched parenthesis!\n");
+                        return false;
+                    }
+                    Expr e = {
+                        .kind = EK_OPERATOR,
+                        .props.op = op_stack.items[op_stack.count - 1],
+                    };
+                    da_append(*ex, e);
+                    op_stack.count--;
+                } while (op_stack.items[op_stack.count - 1] != OP_OPEN_PAREN);
+
+                assert(op_stack.items[op_stack.count - 1] == OP_OPEN_PAREN);
+                op_stack.count--;
+
+                // TODO process top function call from function stack
+            } break;
             case T_IDENT: {  // TODO check if it is not a function call
                 Expr e = {0};
                 e.kind = EK_VAR;
                 e.props.var = strndup(p->lex->token_text, p->lex->token_len);
                 da_append(*ex, e);
-            } break;
-            case T_PLUS: {  // TODO operators should be treated in a special
-                            // unique way
-                da_append(op_stack, (Op){.op = OP_ADDITION});
-            } break;
-            case T_ASSIGN: {  
-                da_append(op_stack, (Op){.op = OP_ASSIGNEMENT});
             } break;
             case T_INT: {  // TODO should all int consts be treated as i32?
                 Expr e = {0};

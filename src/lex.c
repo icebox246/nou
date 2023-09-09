@@ -103,6 +103,12 @@ Token lexer_next_token(Lexer* lexer) {
             case '}':
                 lexer_consume_char(lexer);
                 return lexer->token = T_CLOSE_BRACKETS;
+            case '(':
+                lexer_consume_char(lexer);
+                return lexer->token = T_OPEN_PARENS;
+            case ')':
+                lexer_consume_char(lexer);
+                return lexer->token = T_CLOSE_PARENS;
             case '-':
                 lexer_consume_char(lexer);
                 if (lexer_current_char(lexer) == '>') {
@@ -113,6 +119,9 @@ Token lexer_next_token(Lexer* lexer) {
             case '+':
                 lexer_consume_char(lexer);
                 return lexer->token = T_PLUS;
+            case '*':
+                lexer_consume_char(lexer);
+                return lexer->token = T_STAR;
             default:
                 fprintf(stderr, "%d:%d: Unknown token starting with: '%c'",
                         (int)lexer->token_start_loc.line,

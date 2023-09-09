@@ -4,6 +4,8 @@ export echo;
 export big;
 export nop;
 export variables;
+export expressions;
+export expressions2;
 
 add := fn a: i32, b: i32 -> i32 {
     return a + b;
@@ -25,6 +27,20 @@ nop := fn {};
 
 variables := fn -> i32 {
     a := i32; 
-    a = 21 + 21;
+    b := i32;
+    b = 21;
+    a = b + b;
+    return a;
+};
+
+expressions := fn -> i32 {
+    a := i32; 
+    a = 43 - 3 + 2;
+    return a;
+};
+
+expressions2 := fn -> i32 {
+    a := i32; 
+    a = 2 * (20 + 1);
     return a;
 };

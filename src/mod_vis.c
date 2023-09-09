@@ -46,8 +46,18 @@ void visualize_expr(Expr* e, Visualizer* v) {
                 case OP_ADDITION:
                     fprintf(v->file, "+");
                     break;
+                case OP_SUBTRACTION:
+                    fprintf(v->file, "-");
+                    break;
+                case OP_MULTIPLICATION:
+                    fprintf(v->file, "*");
+                    break;
                 case OP_ASSIGNEMENT:
                     fprintf(v->file, "=");
+                    break;
+
+                case OP_OPEN_PAREN:
+                    assert(false && "Unreachable");
                     break;
             }
             fprintf(v->file, "\n");

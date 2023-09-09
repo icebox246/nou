@@ -233,9 +233,20 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
         } break;
         case EK_OPERATOR: {
             switch (ex->props.op) {
-                case OP_ADDITION:  // TODO figure out which instruction should
-                                   // be codegenned base on type stack
+                case OP_ADDITION:
+                    assert(decision.left_type == VT_I32 &&
+                           decision.right_type == VT_I32);
                     da_append(e, 0x6A);  // opcode for i32.add
+                    break;
+                case OP_SUBTRACTION:
+                    assert(decision.left_type == VT_I32 &&
+                           decision.right_type == VT_I32);
+                    da_append(e, 0x6B);  // opcode for i32.sub
+                    break;
+                case OP_MULTIPLICATION:
+                    assert(decision.left_type == VT_I32 &&
+                           decision.right_type == VT_I32);
+                    da_append(e, 0x6C);  // opcode for i32.mul
                     break;
                 case OP_ASSIGNEMENT: {  // TODO figure out which instruction
                                         // should be codegenned base on type
@@ -253,6 +264,10 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
                     da_append(e, 0x20);  // opcode for local.get
                     bb_append_leb128_u(&e, temp_i32_index);
                 } break;
+
+                case OP_OPEN_PAREN:
+                    assert(false && "Unreachable");
+                    break;
             }
         } break;
     }
@@ -298,7 +313,9 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
                 decision.left_type = type_stack.items[index_stack.count - 2];
                 decision.right_type = type_stack.items[index_stack.count - 1];
                 switch (e->props.op) {
-                    case OP_ADDITION: {
+                    case OP_ADDITION:
+                    case OP_SUBTRACTION:
+                    case OP_MULTIPLICATION: {
                         index_stack.count -= 2;
                         type_stack.count -= 2;
 
@@ -318,6 +335,10 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
                         da_append(index_stack, temp_index);
                         da_append(type_stack, decision.left_type);
                     } break;
+
+                    case OP_OPEN_PAREN:
+                        assert(false && "Unreachable");
+                        break;
                 }
             } break;
         }

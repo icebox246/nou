@@ -55,7 +55,10 @@ typedef enum {
 
 typedef enum {
     OP_ADDITION,
+    OP_SUBTRACTION,
+    OP_MULTIPLICATION,
     OP_ASSIGNEMENT,
+    OP_OPEN_PAREN,
 } OperatorKind;
 
 typedef struct {
