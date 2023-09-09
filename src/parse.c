@@ -265,7 +265,7 @@ bool parse_expression(Parser* p, Expression* ex, Token terminator) {
     assert(false && "Unreachable");
 }
 
-bool parse_decl_statement(Parser* p, char* decl_name) {
+bool parse_decl_statement(Parser* p, ExpressionStatement* st, char* decl_name) {
     Decl d = {0};
     d.name = decl_name;
 
@@ -302,6 +302,31 @@ bool parse_decl_statement(Parser* p, char* decl_name) {
             if (!parse_value_type(p, (ValueType*)&d.value)) {
                 fprintf(stderr, "Failed to parse variable type!\n");
                 return false;
+            }
+            if (st) { // initialization expression
+                st->kind = SK_EXPRESSION;
+                {
+                    Expr e = {
+                        .kind = EK_VAR,
+                        .props.var = decl_name,
+                    };
+                    da_append(st->expr, e);
+                }
+                if (!parse_expression(p, &st->expr, T_SEMICOLON)) {
+                    fprintf(stderr,
+                            "Failed to parse initialization expression!\n");
+                    return false;
+                }
+                if (st->expr.count > 1) {
+                    Expr e = {
+                        .kind = EK_OPERATOR,
+                        .props.op = OP_ASSIGNEMENT,
+                    };
+                    da_append(st->expr, e);
+                } else {
+                    free(st->expr.items);
+                    st->expr = (Expression){0};
+                }
             }
         }
     }
@@ -428,7 +453,7 @@ bool parse_statement(Parser* p, Statement* st) {
             char* name = strndup(p->lex->token_text, p->lex->token_len);
             if (lexer_next_token(p->lex) == T_DECLARE) {
                 *p->lex = backup;
-                if (!parse_decl_statement(p, name)) {
+                if (!parse_decl_statement(p, &st->expr, name)) {
                     fprintf(stderr, "Failed to parse local decl statement!\n");
                     return false;
                 }
@@ -462,7 +487,8 @@ bool parse_global_scope(Parser* p) {
                 break;
             case T_IDENT:
                 if (!parse_decl_statement(
-                        p, strndup(p->lex->token_text, p->lex->token_len)))
+                        p, NULL,
+                        strndup(p->lex->token_text, p->lex->token_len)))
                     return false;
                 break;
             default:

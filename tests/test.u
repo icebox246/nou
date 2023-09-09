@@ -27,32 +27,27 @@ big := fn -> i32 {
 nop := fn {};
 
 variables := fn -> i32 {
-    a := i32; 
-    b := i32;
-    b = 21;
-    a = b + b;
+    b := i32 21;
+    a := i32 b + b; 
     return a;
 };
 
 expressions := fn -> i32 {
-    a := i32; 
-    a = 43 - 3 + 2;
+    a := i32 43 - 3 + 2; 
     return a;
 };
 
 expressions2 := fn -> i32 {
-    a := i32; 
-    a = 2 * (20 + 1);
+    a := i32 2 * (20 + 1); 
     return a;
 };
 
 functions := fn -> i32 {
-    a := i32;
+    a := i32 add(20, 21);
     f := fn {
         t := i32;
         t = 42;
     };
-    a = add(20, 21); 
     f();
     return a;
 };
