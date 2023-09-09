@@ -21,6 +21,22 @@ bool parse_value_type(Parser* p, ValueType* vt) {
     return true;
 }
 
+bool check_decl_name_available(Parser* p, char* decl_name) {
+    size_t scope = p->current_scope;
+    while (true) {
+        DeclScope* s = &p->mod->scopes.items[scope];
+
+        for (size_t i = 0; i < s->count; i++) {
+            if (strcmp(s->items[i].name, decl_name) == 0) {
+                return false;
+            }
+        }
+
+        if (scope == 0) return true;
+        scope = s->parent;
+    }
+}
+
 bool parse_function_type(Parser* p, Function* f) {
     assert(p->lex->token == KW_FN);
 
@@ -42,6 +58,10 @@ bool parse_function_type(Parser* p, Function* f) {
         }
         Decl param = {0};
         param.name = strndup(p->lex->token_text, p->lex->token_len);
+        if (!check_decl_name_available(p, param.name)) {
+            fprintf(stderr, "Redeclaration of `%s` in param!\n", param.name);
+            return false;
+        }
         param.kind = DK_PARAM;
 
         token = lexer_next_token(p->lex);
@@ -266,8 +286,14 @@ bool parse_expression(Parser* p, Expression* ex, Token terminator) {
 }
 
 bool parse_decl_statement(Parser* p, ExpressionStatement* st, char* decl_name) {
-    Decl d = {0};
-    d.name = decl_name;
+    if (!check_decl_name_available(p, decl_name)) {
+        fprintf(stderr, "Redeclaration of `%s`!\n", decl_name);
+        return false;
+    }
+    da_append(p->mod->scopes.items[p->current_scope], (Decl){0});
+    Decl* d = &p->mod->scopes.items[p->current_scope]
+                   .items[p->mod->scopes.items[p->current_scope].count - 1];
+    d->name = decl_name;
 
     Token token = lexer_next_token(p->lex);
 
@@ -279,7 +305,7 @@ bool parse_decl_statement(Parser* p, ExpressionStatement* st, char* decl_name) {
     token = lexer_next_token(p->lex);
     switch (token) {
         case KW_FN: {
-            d.kind = DK_FUNCTION;
+            d->kind = DK_FUNCTION;
             Function f = {0};
             size_t old_scope = p->current_scope;
             if (!parse_function_type(p, &f)) {
@@ -293,17 +319,17 @@ bool parse_decl_statement(Parser* p, ExpressionStatement* st, char* decl_name) {
             }
             p->current_scope = old_scope;
 
-            d.value = p->mod->functions.count;
+            d->value = p->mod->functions.count;
             da_append(p->mod->functions, f);
         } break;
         default: {  // try to parse variable type
             lexer_undo_token(p->lex);
-            d.kind = DK_VARIABLE;
-            if (!parse_value_type(p, (ValueType*)&d.value)) {
+            d->kind = DK_VARIABLE;
+            if (!parse_value_type(p, (ValueType*)&d->value)) {
                 fprintf(stderr, "Failed to parse variable type!\n");
                 return false;
             }
-            if (st) { // initialization expression
+            if (st) {  // initialization expression
                 st->kind = SK_EXPRESSION;
                 {
                     Expr e = {
@@ -337,7 +363,6 @@ bool parse_decl_statement(Parser* p, ExpressionStatement* st, char* decl_name) {
         return false;
     }
 
-    da_append(p->mod->scopes.items[p->current_scope], d);
     return true;
 }
 
