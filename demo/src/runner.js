@@ -20,7 +20,11 @@ export class Runner {
     run() {
         const run = this.wasm.instance.exports.run;
         if (run) {
-            run();
+            try {
+                run();
+            } catch (e) {
+                this.output.push("ERROR: " + e.toString());
+            }
         } else {
             this.output.push("ERROR: missing 'run := fn;'");
         }
