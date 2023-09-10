@@ -7,6 +7,7 @@ export variables;
 export expressions;
 export expressions2;
 export functions;
+export external_functions;
 
 add := fn a: i32, b: i32 -> i32 {
     return a + b;
@@ -47,7 +48,13 @@ functions := fn -> i32 {
     f := fn {
         t := i32;
         t = 42;
-    };
+    }
     f();
     return a;
+};
+
+extern log_int := fn n: i32 -> i32;
+
+external_functions := fn -> i32 {
+    return log_int(42);
 };

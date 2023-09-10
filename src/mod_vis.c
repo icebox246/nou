@@ -132,7 +132,8 @@ void visualize_expr_statement(ReturnStatement* s, Visualizer* v) {
 void visualize_statement(Statement* s, Visualizer* v) {
     switch (s->kind) {
         case SK_EMPTY:
-            assert(false && "Unimplemented");
+            vis_write_indent(v);
+            fprintf(v->file, ";\n");
         case SK_BLOCK:
             visualize_block_statement(&s->block, v);
             break;
@@ -176,6 +177,9 @@ void visualize_decl(Decl* decl, Visualizer* v) {
     switch (decl->kind) {
         case DK_FUNCTION:
             fprintf(v->file, "%s := fn #%zu", decl->name, decl->value);
+            break;
+        case DK_EXTERN_FUNCTION:
+            fprintf(v->file, "extern %s := fn #%zu", decl->name, decl->value);
             break;
         case DK_PARAM:
             fprintf(v->file, "%s := param ", decl->name);
@@ -224,6 +228,44 @@ void visualize_scopes(DeclScopes* scopes, Visualizer* v) {
     fprintf(v->file, "}\n");
 }
 
+// function types
+
+void visualize_function_type(FunctionType* function_type, Visualizer* v) {
+    vis_write_indent(v);
+    fprintf(v->file, "fn type {\n");
+    v->indent++;
+
+    vis_write_indent(v);
+    fprintf(v->file, "param_scope: #%zu\n", function_type->param_scope);
+
+    vis_write_indent(v);
+    fprintf(v->file, "return_type: ");
+    visualize_value_type(function_type->return_type, v);
+    fprintf(v->file, "\n");
+
+    v->indent--;
+    vis_write_indent(v);
+    fprintf(v->file, "}\n");
+}
+
+void visualize_function_types(FunctionTypes* function_types, Visualizer* v) {
+    vis_write_indent(v);
+    fprintf(v->file, "function types {\n");
+    v->indent++;
+
+    for (size_t i = 0; i < function_types->count; i++) {
+        vis_write_indent(v);
+        fprintf(v->file, "#%zu:\n", i);
+        v->indent++;
+        visualize_function_type(&function_types->items[i], v);
+        v->indent--;
+    }
+
+    v->indent--;
+    vis_write_indent(v);
+    fprintf(v->file, "}\n");
+}
+
 // functions
 
 void visualize_function(Function* function, Visualizer* v) {
@@ -240,6 +282,9 @@ void visualize_function(Function* function, Visualizer* v) {
     fprintf(v->file, "\n");
 
     vis_write_indent(v);
+    fprintf(v->file, "function_type: #%zu\n", function->function_type);
+
+    vis_write_indent(v);
     fprintf(v->file, "content:\n");
     v->indent++;
     visualize_statement(&function->content, v);
@@ -250,13 +295,28 @@ void visualize_function(Function* function, Visualizer* v) {
     fprintf(v->file, "}\n");
 }
 
-void visualize_functions(Functions* functions, Visualizer* v) {
+void visualize_functions(Functions* extern_functions, Functions* functions,
+                         Visualizer* v) {
+    vis_write_indent(v);
+    fprintf(v->file, "extern functions {\n");
+    v->indent++;
+    for (size_t i = 0; i < extern_functions->count; i++) {
+        vis_write_indent(v);
+        fprintf(v->file, "#%zu:\n", i);
+        v->indent++;
+        visualize_function(&extern_functions->items[i], v);
+        v->indent--;
+    }
+    v->indent--;
+    vis_write_indent(v);
+    fprintf(v->file, "}\n\n");
+
     vis_write_indent(v);
     fprintf(v->file, "functions {\n");
     v->indent++;
     for (size_t i = 0; i < functions->count; i++) {
         vis_write_indent(v);
-        fprintf(v->file, "#%zu:\n", i);
+        fprintf(v->file, "#%zu:\n", i + extern_functions->count);
         v->indent++;
         visualize_function(&functions->items[i], v);
         v->indent--;
@@ -281,7 +341,10 @@ void visualize_module(Module* mod, FILE* file) {
     visualize_scopes(&mod->scopes, &v);
 
     fprintf(file, "\n");
-    visualize_functions(&mod->functions, &v);
+    visualize_function_types(&mod->function_types, &v);
+
+    fprintf(file, "\n");
+    visualize_functions(&mod->extern_functions, &mod->functions, &v);
 
     fprintf(file, "\n");
 

@@ -1,8 +1,15 @@
 import { readFileSync } from 'fs';
 
-const module = await WebAssembly.instantiate(readFileSync('a.out'));
+const module = await WebAssembly.instantiate(readFileSync('a.out'), {
+    env: {
+        log_int(n) {
+            console.log(n);
+            return n;
+        }
+    }
+});
 
-const { add, add2, big, echo, nop, variables, expressions, expressions2, functions } = module.instance.exports;
+const { add, add2, big, echo, nop, variables, expressions, expressions2, functions, external_functions } = module.instance.exports;
 
 function runTests(tests) {
     for (const [key, value] of Object.entries(tests)) {
@@ -52,5 +59,9 @@ runTests({
     functions: {
         expr: () => functions(),
         expected: 41,
+    },
+    external_functions: {
+        expr: () => external_functions(),
+        expected: 42,
     },
 });

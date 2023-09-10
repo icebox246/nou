@@ -20,6 +20,7 @@ typedef struct {
 
 typedef enum {
     DK_FUNCTION,
+    DK_EXTERN_FUNCTION,
     DK_PARAM,
     DK_VARIABLE,
 } DeclKind;
@@ -140,6 +141,7 @@ typedef struct {
     Exports exports;
     DeclScopes scopes;
     FunctionTypes function_types;
+    Functions extern_functions;
     Functions functions;
 } Module;
 

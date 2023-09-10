@@ -169,6 +169,11 @@ bool find_local_fn(Module* mod, size_t scope, char* name, size_t* out_index) {
         Decl* decl = &s->items[i];
         if (strcmp(decl->name, name) == 0) {
             if (decl->kind == DK_FUNCTION) {
+                if (out_index)
+                    *out_index = decl->value + mod->extern_functions.count;
+                return true;
+            }
+            if (decl->kind == DK_EXTERN_FUNCTION) {
                 if (out_index) *out_index = decl->value;
                 return true;
             }
@@ -241,6 +246,9 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
             }
             switch (var_decl->kind) {
                 case DK_FUNCTION:
+                    assert(false && "Unimplemented");
+                    break;
+                case DK_EXTERN_FUNCTION:
                     assert(false && "Unimplemented");
                     break;
                 case DK_PARAM:
@@ -396,8 +404,9 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
                     case OP_ASSIGNEMENT: {
                         index_stack.count -= 2;
                         type_stack.count -= 2;
-                        assert(li != temp_index &&
-                               "Cannot assign to temporary value");
+                        if (li == temp_index) {
+                            assert(false && "Cannot assign to temporary value");
+                        }
                         decisions.items[li].take_reference = true;
 
                         da_append(index_stack, temp_index);
@@ -414,7 +423,13 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
                 size_t fn_index;
                 assert(find_local_fn(mod, scope, e->props.func, &fn_index) &&
                        "Calling undefined function");
-                Function* f = &mod->functions.items[fn_index];
+                Function* f;
+                if (fn_index >= mod->extern_functions.count)
+                    f = &mod->functions
+                             .items[fn_index - mod->extern_functions.count];
+                else
+                    f = &mod->extern_functions.items[fn_index];
+
                 DeclScope* param_scope = &mod->scopes.items[f->param_scope];
                 size_t arity = param_scope->count;
 
@@ -644,6 +659,38 @@ Section codegen_funcs(Module* mod) {
     return func_section;
 }
 
+Section codegen_import(Module* mod) {
+    Section import_section = {.id = SID_IMPORT};
+
+    Vec imports = {0};
+
+    for (size_t i = 0; i < mod->extern_functions.count; i++) {
+        ByteBuffer imp = {0};
+        // TODO make module name customizable
+        bb_append_name(&imp, "env");  // module
+        char* name = NULL;
+        for (size_t j = 0; j < mod->scopes.items[0].count; j++) {
+            Decl* d = &mod->scopes.items[0].items[j];
+            if (d->kind == DK_EXTERN_FUNCTION && d->value == i) {
+                name = d->name;
+            }
+        }
+        if (name == NULL) {
+            assert(false && "Could not find decl of extern function");
+        }
+        bb_append_name(&imp, name);  // name
+        da_append(imp, 0x00);        // func
+        bb_append_leb128_u(&imp, mod->extern_functions.items[i].function_type);
+        vec_append_elem(&imports, &imp);
+        free(imp.items);
+    }
+
+    bb_append_vec(&import_section.content, &imports);
+    free(imports.content.items);
+
+    return import_section;
+}
+
 Section codegen_mem(Module* mod) {
     Section mem_section = {.id = SID_MEMORY};
 
@@ -700,7 +747,7 @@ Section codegen_exports(Module* mod) {
         ByteBuffer ex = {0};
         bb_append_name(&ex, decl->name);
         da_append(ex, 0x00);  // TODO support other export types
-        bb_append_leb128_u(&ex, decl->value);
+        bb_append_leb128_u(&ex, decl->value + mod->extern_functions.count);
 
         vec_append_elem(&exports, &ex);
 
@@ -746,6 +793,12 @@ ByteBuffer codegen_module(Module* mod) {
         Section type_section = codegen_types(mod);
         bb_append_section(&gen.output_buffer, &type_section);
         free(type_section.content.items);
+    }
+
+    {  // import
+        Section import_section = codegen_import(mod);
+        bb_append_section(&gen.output_buffer, &import_section);
+        free(import_section.content.items);
     }
 
     {  // funcs

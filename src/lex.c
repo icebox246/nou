@@ -1,6 +1,7 @@
 #include "lex.h"
 
 #include <ctype.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,6 +28,24 @@ void lexer_consume_char(Lexer* lexer) {
     lexer->token_len++;
 }
 
+bool is_ident_char(char c) {
+    switch (c) {
+        case '_':
+            return true;
+        default:
+            return isalnum(c);
+    }
+}
+
+bool is_beginning_ident_char(char c) {
+    switch (c) {
+        case '_':
+            return true;
+        default:
+            return isalpha(c);
+    }
+}
+
 Token lexer_next_token(Lexer* lexer) {
     while (isspace(lexer_current_char(lexer)) &&
            lexer->offset < lexer->input_size) {
@@ -39,9 +58,9 @@ Token lexer_next_token(Lexer* lexer) {
     lexer->token_len = 0;
     lexer->token_start_loc = lexer->token_end_loc;
 
-    if (isalpha(lexer_current_char(lexer))) {
+    if (is_beginning_ident_char(lexer_current_char(lexer))) {
         // indentifier or keyword
-        while (isalnum(lexer_current_char(lexer))) {
+        while (is_ident_char(lexer_current_char(lexer))) {
             lexer_consume_char(lexer);
         }
 
@@ -52,6 +71,10 @@ Token lexer_next_token(Lexer* lexer) {
         if (lexer->token_len == 6 &&
             strncmp("export", lexer->token_text, lexer->token_len) == 0) {
             return lexer->token = KW_EXPORT;
+        }
+        if (lexer->token_len == 6 &&
+            strncmp("extern", lexer->token_text, lexer->token_len) == 0) {
+            return lexer->token = KW_EXTERN;
         }
         if (lexer->token_len == 6 &&
             strncmp("return", lexer->token_text, lexer->token_len) == 0) {

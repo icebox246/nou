@@ -81,6 +81,9 @@ bool parse_function_type(Parser* p, Function* f) {
         da_append(p->mod->scopes, scope);
     }
 
+    size_t old_scope = p->current_scope;
+    p->current_scope = f->param_scope;
+
     Token token;
     while ((token = lexer_next_token(p->lex)) != T_ARROW &&
            token != T_OPEN_BRACKETS) {
@@ -113,12 +116,18 @@ bool parse_function_type(Parser* p, Function* f) {
         token = lexer_next_token(p->lex);
 
         if (token != T_COMMA) {
-            if (token == T_ARROW || token == T_OPEN_BRACKETS) break;
+            if (token == T_ARROW || token == T_OPEN_BRACKETS ||
+                token == T_SEMICOLON)
+                break;
 
-            fprintf(stderr, "Expected comma, arrow or '{', got %d!\n", token);
+            fprintf(stderr,
+                    "Expected comma, arrow, semicolon or '{', got %d!\n",
+                    token);
             return false;
         }
     }
+
+    p->current_scope = old_scope;
 
     if (token == T_ARROW) {
         if (!parse_value_type(p, &f->return_type)) {
@@ -127,7 +136,7 @@ bool parse_function_type(Parser* p, Function* f) {
         }
     }
 
-    if (p->lex->token == T_OPEN_BRACKETS) {
+    if (p->lex->token == T_OPEN_BRACKETS || p->lex->token == T_SEMICOLON) {
         lexer_undo_token(p->lex);
     }
 
@@ -432,6 +441,67 @@ bool parse_export_statement(Parser* p) {
     return true;
 }
 
+bool parse_extern_statement(Parser* p) {
+    assert(p->lex->token == KW_EXTERN);
+
+    Token token = lexer_next_token(p->lex);
+
+    char* name;
+
+    switch (token) {
+        case T_IDENT:
+            name = strndup(p->lex->token_text, p->lex->token_len);
+            break;
+        default:
+            fprintf(stderr, "Unexpected token extern statement, got %d!\n",
+                    token);
+            return false;
+    }
+
+    if (!check_decl_name_available(p, name)) {
+        fprintf(stderr, "Redeclaration of `%s` in extern!\n", name);
+        return false;
+    }
+    da_append(p->mod->scopes.items[0], (Decl){0});
+    Decl* d = &p->mod->scopes.items[0].items[p->mod->scopes.items[0].count - 1];
+    d->kind = DK_EXTERN_FUNCTION;
+    d->name = name;
+
+    token = lexer_next_token(p->lex);
+
+    if (token != T_DECLARE) {
+        fprintf(stderr, "Expected `:=` after extern statement, got %d!\n",
+                token);
+        return false;
+    }
+
+    token = lexer_next_token(p->lex);
+
+    if (token != KW_FN) {
+        fprintf(stderr, "Extern supports only function, got %d!\n", token);
+        return false;
+    }
+
+    Function f = {0};
+
+    if (!parse_function_type(p, &f)) {
+        fprintf(stderr, "Failed to parse function type in extern!\n");
+        return false;
+    }
+
+    token = lexer_next_token(p->lex);
+
+    if (token != T_SEMICOLON) {
+        fprintf(stderr, "Expected semicolon after extern statement %d!\n",
+                token);
+        return false;
+    }
+
+    d->value = p->mod->extern_functions.count;
+    da_append(p->mod->extern_functions, f);
+    return true;
+}
+
 bool parse_block_statement(Parser* p, BlockStatement* st) {
     st->kind = SK_BLOCK;
     size_t old_scope = p->current_scope;
@@ -548,6 +618,9 @@ bool parse_global_scope(Parser* p) {
                 return true;
             case KW_EXPORT:
                 if (!parse_export_statement(p)) return false;
+                break;
+            case KW_EXTERN:
+                if (!parse_extern_statement(p)) return false;
                 break;
             case T_IDENT:
                 if (!parse_decl_statement(

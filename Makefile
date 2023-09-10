@@ -13,7 +13,7 @@ HEADERS += src/codegen.h
 HEADERS += src/da.h
 
 u: ${SOURCES} ${HEADERS}
-	${CC} ${SOURCES} -o $@
+	${CC} ${SOURCES} -o $@ -ggdb
 
 test: u
 	cd tests && ../u test.u && node test.mjs 

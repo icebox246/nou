@@ -24,6 +24,7 @@ typedef enum {
 
     KW_FN,
     KW_EXPORT,
+    KW_EXTERN,
     KW_RETURN,
 
     KW_i32,

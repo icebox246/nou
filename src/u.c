@@ -49,7 +49,7 @@ int main(int argc, char** argv) {
 
         Module mod = parse(&lexer);
 
-        /* visualize_module(&mod, stdout); */
+        visualize_module(&mod, stdout);
 
         ByteBuffer output = codegen_module(&mod);
 
