@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NoU demo</title>
+</head>
+
+<body>
+    <main>
+        <div class="flex-pane">
+            <div class="button-container">
+                <p>source code:</p>
+                <button id="run-button">run</button>
+            </div>
+            <textarea name="code-editor" id="code-editor"></textarea>
+        </div>
+        <div class="pane">
+            <section id="compiler-tokens"></section>
+            <section id="compiler-visualization"></section>
+            <section id="compiler-errors"></section>
+            <section id="app-output"></section>
+        </div>
+    </main>
+    <script type="module" src="src/main.js"></script>
+</body>
+
+</html>

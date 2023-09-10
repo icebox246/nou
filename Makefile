@@ -1,4 +1,5 @@
 CC = clang
+WASI_CC = ${WASI_SDK_DIR}/bin/clang
 
 SOURCES += src/u.c
 SOURCES += src/lex.c
@@ -14,6 +15,9 @@ HEADERS += src/da.h
 
 u: ${SOURCES} ${HEADERS}
 	${CC} ${SOURCES} -o $@ -ggdb
+
+demo: 
+	${WASI_CC} ${SOURCES} -o demo/public/u.wasm
 
 test: u
 	cd tests && ../u test.u && node test.mjs 

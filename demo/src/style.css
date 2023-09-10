@@ -1,0 +1,120 @@
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code&display=swap');
+
+:root {
+    --bg:  #202020;
+    --bg2: #2D282E;
+    --ac:  #D3B9F9;
+    --fg:  #EFEFEF;
+}
+
+@media (prefers-color-scheme: light) {
+    :root {
+        --bg:  #DFDFDF;
+        --bg2: #D0AFD5;
+        --ac:  #D3B9F9;
+        --fg:  #101010;
+    }
+}
+
+* {
+    margin: 0; 
+    padding: 0; 
+    font-family: 'Fira Code', monospace;
+    box-sizing: border-box;
+    font-size: 1em;
+    color: var(--fg);
+}
+
+main {
+    min-height: 100vh;
+    max-height: 100vh;
+    background: linear-gradient(var(--bg), var(--bg) 80%, var(--bg2));
+    display: flex;
+    justify-content: stretch;
+}
+
+.flex-pane {
+    flex: 1;
+    display: flex;
+    padding: 1em;
+    flex-direction: column;
+    justify-content: stretch;
+}
+.pane {
+    flex: 1;
+    padding: 1em;
+    overflow-y: auto;
+}
+
+.code-editor {
+    flex: 1;
+    display: block;
+    background: var(--bg);
+    outline: 0;
+    padding: 1em;
+    border: var(--ac) 1px solid;
+    border-radius: 0.2em;
+    resize: none;
+}
+
+.button-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.button {
+    padding: 0.5em 1em;    
+    border-radius: 0.2em;
+    border: var(--ac) 1px solid;
+    background: transparent;
+    color: var(--fg);
+    transition: color 400ms, background 200ms;
+    cursor: pointer;
+}
+
+.button:hover {
+    background: var(--ac);
+    color: var(--bg)
+}
+
+.collapsible-section {
+    margin: 0.5em;
+    border: var(--ac) 1px solid;
+    border-radius: 0.2em;
+    background: var(--bg);
+    overflow: hidden;
+}
+
+.collapsible-section header {
+    display: flex;
+    justify-content: space-between;
+    padding: 0.5em;
+    transition: background 200ms;
+    cursor: pointer;
+}
+
+.collapsible-section header:hover {
+    background: var(--ac);
+}
+
+.collapsible-section header * {
+    transition: color 400ms;
+}
+
+.collapsible-section header:hover * {
+    color: var(--bg);
+}
+
+.collapsible-section pre {
+    padding: 1em;
+    border-top: var(--ac) 1px solid;
+    transition: height 300ms, padding 300ms;
+    overflow-x: auto;
+}
+
+.collapsible-section.collapsed pre {
+    padding: 0 1em;
+    height: 0;
+    overflow: hidden;
+}

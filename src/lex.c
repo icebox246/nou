@@ -47,29 +47,31 @@ bool is_beginning_ident_char(char c) {
 }
 
 Token lexer_next_token(Lexer* lexer) {
-    while (isspace(lexer_current_char(lexer)) &&
-           lexer->offset < lexer->input_size) {
-        lexer_consume_char(lexer);
-    }
+    while (true) {
+        bool something_was_done = false;
+        while (isspace(lexer_current_char(lexer)) &&
+               lexer->offset < lexer->input_size) {
+            lexer_consume_char(lexer);
+            something_was_done = true;
+        }
 
-    if (lexer->offset == lexer->input_size) return lexer->token = T_END;
+        if (lexer->offset == lexer->input_size) return lexer->token = T_END;
 
-    if (lexer->input_size - lexer->offset >= 2) {
-        if (lexer_current_char(lexer) == '/' &&
-            lexer->input_buffer[lexer->offset + 1] == '/') {
-            // comment
-            while (lexer_current_char(lexer) != '\n') {
-                lexer_consume_char(lexer);
+        if (lexer->input_size - lexer->offset >= 2) {
+            if (lexer_current_char(lexer) == '/' &&
+                lexer->input_buffer[lexer->offset + 1] == '/') {
+                // comment
+                while (lexer_current_char(lexer) != '\n') {
+                    lexer_consume_char(lexer);
+                    something_was_done = true;
+                }
             }
         }
-    }
 
-    while (isspace(lexer_current_char(lexer)) &&
-           lexer->offset < lexer->input_size) {
-        lexer_consume_char(lexer);
-    }
+        if (lexer->offset == lexer->input_size) return lexer->token = T_END;
 
-    if (lexer->offset == lexer->input_size) return lexer->token = T_END;
+        if(!something_was_done) break;
+    }
 
     lexer->token_text = &lexer->input_buffer[lexer->offset];
     lexer->token_len = 0;
