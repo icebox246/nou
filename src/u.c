@@ -1,3 +1,4 @@
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -43,6 +44,11 @@ int main(int argc, char** argv) {
     }
 
     FILE* input_file = fopen(input_file_name, "r");
+    if (!input_file) {
+        fprintf(stderr, "Failed to open file `%s`: %s", input_file_name,
+                strerror(errno));
+        return -1;
+    }
     fseek(input_file, 0, SEEK_END);
     size_t input_file_size = ftell(input_file);
     fseek(input_file, 0, SEEK_SET);
