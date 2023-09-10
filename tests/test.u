@@ -1,3 +1,4 @@
+// exports 
 export add;
 export add2;
 export echo;
@@ -9,40 +10,49 @@ export expressions2;
 export functions;
 export external_functions;
 
+// adds two numbers 
 add := fn a: i32, b: i32 -> i32 {
     return a + b;
 };
 
+// adds 2 to a number
 add2 := fn x: i32 -> i32 {
     return x + 2;
 };
 
+// echoes passed number
 echo := fn x: i32 -> i32 {
     return x;
 };
 
+// returns a big number
 big := fn -> i32 {
     return 123456789;
 };
 
+// does nothing
 nop := fn {};
 
+// uses variables
 variables := fn -> i32 {
     b := i32 21;
     a := i32 b + b; 
     return a;
 };
 
+// tests operator associativity
 expressions := fn -> i32 {
     a := i32 43 - 3 + 2; 
     return a;
 };
 
+// tests parentheses
 expressions2 := fn -> i32 {
     a := i32 2 * (20 + 1); 
     return a;
 };
 
+// tests function calls
 functions := fn -> i32 {
     a := i32 add(20, 21);
     f := fn {
@@ -55,6 +65,7 @@ functions := fn -> i32 {
 
 extern log_int := fn n: i32 -> i32;
 
+// tests external function calls
 external_functions := fn -> i32 {
     return log_int(42);
 };

@@ -54,6 +54,23 @@ Token lexer_next_token(Lexer* lexer) {
 
     if (lexer->offset == lexer->input_size) return lexer->token = T_END;
 
+    if (lexer->input_size - lexer->offset >= 2) {
+        if (lexer_current_char(lexer) == '/' &&
+            lexer->input_buffer[lexer->offset + 1] == '/') {
+            // comment
+            while (lexer_current_char(lexer) != '\n') {
+                lexer_consume_char(lexer);
+            }
+        }
+    }
+
+    while (isspace(lexer_current_char(lexer)) &&
+           lexer->offset < lexer->input_size) {
+        lexer_consume_char(lexer);
+    }
+
+    if (lexer->offset == lexer->input_size) return lexer->token = T_END;
+
     lexer->token_text = &lexer->input_buffer[lexer->offset];
     lexer->token_len = 0;
     lexer->token_start_loc = lexer->token_end_loc;
