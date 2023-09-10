@@ -576,8 +576,8 @@ Section codegen_types(Module* mod) {
 
     Vec types = {0};
 
-    for (size_t i = 0; i < mod->functions.count; i++) {
-        Function* f = &mod->functions.items[i];
+    for (size_t i = 0; i < mod->function_types.count; i++) {
+        FunctionType* f = &mod->function_types.items[i];
         ByteBuffer ft = {0};
         // magic byte
         // https://webassembly.github.io/spec/core/binary/types.html#binary-functype
@@ -632,10 +632,8 @@ Section codegen_funcs(Module* mod) {
     Vec funcs = {0};
 
     for (size_t i = 0; i < mod->functions.count; i++) {
-        // TODO
-        // this is a very naive way of deducing function types
         ByteBuffer fn = {0};
-        bb_append_leb128_u(&fn, i);
+        bb_append_leb128_u(&fn, mod->functions.items[i].function_type);
         vec_append_elem(&funcs, &fn);
         free(fn.items);
     }

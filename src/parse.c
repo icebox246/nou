@@ -37,6 +37,38 @@ bool check_decl_name_available(Parser* p, char* decl_name) {
     }
 }
 
+bool compare_value_types(ValueType a, ValueType b) {
+    return a ==
+           b;  // TODO when ValueType gets more complicated improve this check
+}
+
+bool find_function_type_idx(Parser* p, FunctionType ft, size_t* out_index) {
+    DeclScope* ps = &p->mod->scopes.items[ft.param_scope];
+    for (size_t i = 0; i < p->mod->function_types.count; i++) {
+        FunctionType ft2 = p->mod->function_types.items[i];
+        if (!compare_value_types(ft.return_type, ft2.return_type))
+            continue;  // non-matching return types
+
+        DeclScope* ps2 = &p->mod->scopes.items[ft2.param_scope];
+        if (ps->count != ps2->count) continue;  // arity mismatch
+
+        bool matching_args = true;
+        for (size_t j = 0; j < ps->count; j++) {
+            if (!compare_value_types(ps->items[j].value, ps2->items[j].value)) {
+                matching_args = false;
+                break;
+            }
+        }
+
+        if (!matching_args) continue;
+
+        if (out_index) *out_index = i;
+        return true;  // function types match
+    }
+    if (out_index) *out_index = p->mod->function_types.count;
+    return false;
+}
+
 bool parse_function_type(Parser* p, Function* f) {
     assert(p->lex->token == KW_FN);
 
@@ -97,6 +129,13 @@ bool parse_function_type(Parser* p, Function* f) {
 
     if (p->lex->token == T_OPEN_BRACKETS) {
         lexer_undo_token(p->lex);
+    }
+
+    FunctionType ft = {.param_scope = f->param_scope,
+                       .return_type = f->return_type};
+
+    if (!find_function_type_idx(p, ft, &f->function_type)) {
+        da_append(p->mod->function_types, ft);
     }
 
     return true;

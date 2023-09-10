@@ -110,12 +110,24 @@ typedef union Statement {
 
 typedef struct BlockStatement BlockStatement;
 
+// function types
+
+typedef struct {
+    size_t param_scope;
+    ValueType return_type;
+} FunctionType;
+
+typedef struct {
+    da_list(FunctionType);
+} FunctionTypes;
+
 // functions
 
 typedef struct {
     size_t param_scope;
     ValueType return_type;
     Statement content;
+    size_t function_type;
 } Function;
 
 typedef struct {
@@ -127,6 +139,7 @@ typedef struct {
 typedef struct {
     Exports exports;
     DeclScopes scopes;
+    FunctionTypes function_types;
     Functions functions;
 } Module;
 
