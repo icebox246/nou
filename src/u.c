@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "codegen.h"
 #include "lex.h"
@@ -7,14 +8,39 @@
 #include "parse.h"
 
 int main(int argc, char** argv) {
-    if (argc <= 1) {
-        fprintf(stderr, "input file must be provided");
-        return -1;
+    char* input_file_name = NULL;
+    bool show_visualization = false;
+    bool show_tokens = false;
+    argv++;
+    argc--;
+
+    while (argc) {
+        if ((*argv)[0] == '-') {
+            size_t len = strlen(*argv);
+            for (size_t i = 1; i < len; i++) {
+                switch ((*argv)[i]) {
+                    case 'v':
+                        show_visualization = true;
+                        break;
+                    case 't':
+                        show_tokens = true;
+                        break;
+                    default:
+                        fprintf(stderr, "Unknown flag `%c`", (*argv)[i]);
+                        return -1;
+                }
+            }
+        } else {
+            input_file_name = *argv;
+        }
+        argv++;
+        argc--;
     }
 
-    argv++;
-
-    char* input_file_name = *argv;
+    if (!input_file_name) {
+        fprintf(stderr, "Input file name must be provided");
+        return -1;
+    }
 
     FILE* input_file = fopen(input_file_name, "r");
     fseek(input_file, 0, SEEK_END);
@@ -24,22 +50,19 @@ int main(int argc, char** argv) {
     fread(input_file_buffer, input_file_size, 1, input_file);
     fclose(input_file);
 
-    // TODO add flags which enables displaying tokens
-    /* { */
-    /*     Lexer lexer = { */
-    /*         .input_buffer = input_file_buffer, */
-    /*         .input_size = input_file_size, */
-    /*     }; */
+    if (show_tokens) {
+        Lexer lexer = {
+            .input_buffer = input_file_buffer,
+            .input_size = input_file_size,
+        };
 
-    /*     Token token; */
-    /*     while ((token = lexer_next_token(&lexer)) != T_END) { */
-    /*         printf("%d:%d: Token: %d %.*s\n",
-     * (int)lexer.token_start_loc.line, */
-    /*                (int)lexer.token_start_loc.col, token,
-     * (int)lexer.token_len, */
-    /*                lexer.token_text); */
-    /*     } */
-    /* } */
+        Token token;
+        while ((token = lexer_next_token(&lexer)) != T_END) {
+            printf("%d:%d: Token: %d %.*s\n", (int)lexer.token_start_loc.line,
+                   (int)lexer.token_start_loc.col, token, (int)lexer.token_len,
+                   lexer.token_text);
+        }
+    }
 
     {
         Lexer lexer = {
@@ -49,7 +72,9 @@ int main(int argc, char** argv) {
 
         Module mod = parse(&lexer);
 
-        visualize_module(&mod, stdout);
+        if (show_visualization) {
+            visualize_module(&mod, stdout);
+        }
 
         ByteBuffer output = codegen_module(&mod);
 

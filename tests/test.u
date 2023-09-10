@@ -48,7 +48,7 @@ functions := fn -> i32 {
     f := fn {
         t := i32;
         t = 42;
-    }
+    };
     f();
     return a;
 };
