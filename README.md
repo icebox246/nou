@@ -1,6 +1,12 @@
 # NoU programming language
 
+[![deploy](https://github.com/icebox246/nou/actions/workflows/deploy.yml/badge.svg)](https://github.com/icebox246/nou/actions/workflows/deploy.yml)
+
+[![tests](https://github.com/icebox246/nou/actions/workflows/tests.yml/badge.svg)](https://github.com/icebox246/nou/actions/workflows/tests.yml)
+
 Simple language, targeting [WASM](https://webassembly.org/).
+
+Live demo available here: [icebox246.github.io/nou](https://icebox246.github.io/nou/).
 
 ## Getting started
 
