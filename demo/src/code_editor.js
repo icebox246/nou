@@ -6,6 +6,7 @@ import defaultText from './example.u?raw'
 export function setupCodeEditor(element) {
     element.classList.add("code-editor");
     element.spellcheck = false;
+    element.wrap = "off";
     element.value = defaultText;
 
     return {
