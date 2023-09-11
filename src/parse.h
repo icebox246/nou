@@ -28,6 +28,7 @@ typedef enum {
 typedef enum {
     VT_NIL,
     VT_I32,
+    VT_BOOL,
 } ValueType;
 
 typedef struct {
@@ -50,6 +51,7 @@ typedef struct {
 
 typedef enum {
     EK_I32_CONST,
+    EK_BOOL_CONST,
     EK_VAR,
     EK_OPERATOR,
     EK_FUNC_CALL,
@@ -62,6 +64,10 @@ typedef enum {
     OP_REMAINDER,
     OP_DIVISION,
     OP_ASSIGNEMENT,
+    OP_EQUALITY,
+    OP_ALTERNATIVE,
+    OP_CONJUNCTION,
+
     OP_OPEN_PAREN,
     OP_FUNC_CALL,
 } OperatorKind;
@@ -70,6 +76,7 @@ typedef struct {
     ExprKind kind;
     union {
         int32_t i32;
+        bool boolean;
         char* var;
         OperatorKind op;
         char* func;

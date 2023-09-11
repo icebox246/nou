@@ -116,6 +116,11 @@ ByteBuffer codegen_value_type(Module* mod, ValueType vt) {
             da_append(bb, 0x7F);
             return bb;
         } break;
+        case VT_BOOL: {  // bool internally gets codegenned as i32
+            ByteBuffer bb = {0};
+            da_append(bb, 0x7F);
+            return bb;
+        } break;
     }
 
     assert(false && "Unreachable");
@@ -127,6 +132,9 @@ size_t get_size_of_value_type(Module* mod, ValueType vt) {
             return 0;
         case VT_I32:
             return 4;
+        case VT_BOOL:
+            return 1;
+            break;
     }
 }
 
@@ -235,6 +243,10 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
             da_append(e, 0x41);                     // opcode for i32.const
             bb_append_leb128_u(&e, ex->props.i32);  // TODO make it signed
             break;
+        case EK_BOOL_CONST:
+            da_append(e, 0x41);  // opcode for i32.const
+            bb_append_leb128_u(&e, ex->props.boolean);
+            break;
         case EK_VAR: {
             size_t var_index;
             Decl* var_decl;
@@ -277,11 +289,20 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
                         da_append(e, 0x20);  // opcode for local.get
                         bb_append_leb128_u(&e, stack_base_index);
 
-                        assert(var_decl->value == VT_I32 &&
-                               "Only i32 variables are supported now");
-                        da_append(e, 0x28);         // opcode for i32.load
-                        bb_append_leb128_u(&e, 0);  // align
-                        bb_append_leb128_u(&e, var_index);  // offset
+                        switch ((ValueType)var_decl->value) {
+                            case VT_I32:
+                                da_append(e, 0x28);  // opcode for i32.load
+                                bb_append_leb128_u(&e, 0);          // align
+                                bb_append_leb128_u(&e, var_index);  // offset
+                                break;
+                            case VT_BOOL:
+                                da_append(e, 0x2D);  // opcode for i32.load8_u
+                                bb_append_leb128_u(&e, 0);          // align
+                                bb_append_leb128_u(&e, var_index);  // offset
+                                break;
+                            default:
+                                assert(false && "Unsupported variable type");
+                        }
                     }
                 } break;
             }
@@ -312,6 +333,21 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
                     assert(decision.left_type == VT_I32 &&
                            decision.right_type == VT_I32);
                     da_append(e, 0x6D);  // opcode for i32.div_s
+                    break;
+                case OP_EQUALITY:
+                    assert(decision.left_type == VT_I32 &&
+                           decision.right_type == VT_I32);
+                    da_append(e, 0x46);  // opcode for i32.eq
+                    break;
+                case OP_ALTERNATIVE:
+                    assert(decision.left_type == VT_BOOL &&
+                           decision.right_type == VT_BOOL);
+                    da_append(e, 0x72);  // opcode for i32.or
+                    break;
+                case OP_CONJUNCTION:
+                    assert(decision.left_type == VT_BOOL &&
+                           decision.right_type == VT_BOOL);
+                    da_append(e, 0x71);  // opcode for i32.and
                     break;
                 case OP_ASSIGNEMENT: {  // TODO figure out which instruction
                                         // should be codegenned base on type
@@ -384,6 +420,10 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
                 da_append(index_stack, temp_index);
                 da_append(type_stack, VT_I32);
             } break;
+            case EK_BOOL_CONST: {
+                da_append(index_stack, temp_index);
+                da_append(type_stack, VT_BOOL);
+            } break;
             case EK_VAR: {
                 Decl* decl;
                 assert(find_local_var(mod, scope, e->props.var, NULL, &decl) &&
@@ -403,7 +443,9 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
                     case OP_SUBTRACTION:
                     case OP_MULTIPLICATION:
                     case OP_REMAINDER:
-                    case OP_DIVISION: {
+                    case OP_DIVISION:
+                    case OP_ALTERNATIVE:
+                    case OP_CONJUNCTION: {
                         index_stack.count -= 2;
                         type_stack.count -= 2;
 
@@ -412,6 +454,12 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
                             type_stack,
                             decision.left_type);  // TODO maybe there should be
                                                   // a smarter system for that
+                    } break;
+                    case OP_EQUALITY: {
+                        index_stack.count -= 2;
+                        type_stack.count -= 2;
+                        da_append(index_stack, temp_index);
+                        da_append(type_stack, VT_BOOL);
                     } break;
                     case OP_ASSIGNEMENT: {
                         index_stack.count -= 2;

@@ -10,11 +10,11 @@ highligh link NOUNumber Number
 syn keyword NOUKeyword export extern fn return 
 highligh link NOUKeyword Keyword
 
-syn keyword NOUType i32
+syn keyword NOUType i32 bool
 highligh link NOUType Type
 
-" syn keyword NOUBoolean true false 
-" highligh link NOUBoolean Boolean
+syn keyword NOUBoolean true false 
+highligh link NOUBoolean Boolean
 
 " syn keyword NOUConstant null
 " highligh link NOUConstant Constant
@@ -25,11 +25,14 @@ syn match NOUFunction /\(\<export\s*\)\@<=\<[A-Za-z_][A-Za-z0-9_]*/
 highligh link NOUFunction Function
 
 syn match NOUOperator "="
+syn match NOUOperator "=="
 syn match NOUOperator "+"
 syn match NOUOperator "-" 
 syn match NOUOperator "*"
 syn match NOUOperator "/"
 syn match NOUOperator "%"
+syn match NOUOperator "\<and\>"
+syn match NOUOperator "\<or\>"
 highligh link NOUOperator Operator
 
 syn match NOUDelimiter ":"

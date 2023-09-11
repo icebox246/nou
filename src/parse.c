@@ -14,6 +14,9 @@ bool parse_value_type(Parser* p, ValueType* vt) {
         case KW_i32:
             *vt = VT_I32;
             break;
+        case KW_bool:
+            *vt = VT_BOOL;
+            break;
         default:
             fprintf(stderr, "Unexpected token in value type %d!\n", token);
             return false;
@@ -155,10 +158,21 @@ size_t operator_precedence(OperatorKind op) {
         case OP_MULTIPLICATION:
         case OP_REMAINDER:
         case OP_DIVISION:
-            return 3;
+            return 6;
+
         case OP_ADDITION:
         case OP_SUBTRACTION:
+            return 5;
+
+        case OP_EQUALITY:
+            return 4;
+
+        case OP_CONJUNCTION:
+            return 3;
+
+        case OP_ALTERNATIVE:
             return 2;
+
         case OP_ASSIGNEMENT:
             return 1;
 
@@ -180,6 +194,9 @@ size_t operator_associativity(OperatorKind op) {
         case OP_MULTIPLICATION:
         case OP_REMAINDER:
         case OP_DIVISION:
+        case OP_EQUALITY:
+        case OP_ALTERNATIVE:
+        case OP_CONJUNCTION:
             return OPA_LEFT;
 
         case OP_ASSIGNEMENT:
@@ -205,6 +222,12 @@ OperatorKind operator_of_token(Token tok) {
             return OP_REMAINDER;
         case T_SLASH:
             return OP_DIVISION;
+        case T_EQUAL:
+            return OP_EQUALITY;
+        case KW_OR:
+            return OP_ALTERNATIVE;
+        case KW_AND:
+            return OP_CONJUNCTION;
         default:
             return -1;
     }
@@ -315,6 +338,13 @@ bool parse_expression(Parser* p, Expression* ex, Token terminator) {
                 Expr e = {
                     .kind = EK_I32_CONST,
                     .props.i32 = p->lex->token_int,
+                };
+                da_append(*ex, e);
+            } break;
+            case T_BOOL: {
+                Expr e = {
+                    .kind = EK_BOOL_CONST,
+                    .props.boolean = p->lex->token_bool,
                 };
                 da_append(*ex, e);
             } break;

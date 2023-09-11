@@ -20,4 +20,4 @@ demo:
 	${WASI_CC} ${SOURCES} -o demo/public/u.wasm
 
 test: u
-	cd tests && ../u test.u && node test.mjs 
+	cd tests && ../u ${UFLAGS} test.u && node test.mjs 

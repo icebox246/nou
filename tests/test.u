@@ -10,6 +10,8 @@ export expressions2;
 export expressions3;
 export functions;
 export external_functions;
+export boolean_values;
+export boolean_values2;
 
 // adds two numbers 
 add := fn a: i32, b: i32 -> i32 {
@@ -75,4 +77,16 @@ extern log_int := fn n: i32 -> i32;
 // tests external function calls
 external_functions := fn -> i32 {
     return log_int(42);
+};
+
+boolean_values := fn n: i32 -> bool {
+   is_even := bool;
+   is_even = n % 2 == 0;
+   return is_even;
+};
+
+boolean_values2 := fn n: i32 -> bool {
+   is_divisible_by_6 := bool true or false;
+   is_divisible_by_6 = (6 % 3 == 0 and 6 % 2 == 0);
+   return is_divisible_by_6;
 };

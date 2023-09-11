@@ -70,7 +70,7 @@ Token lexer_next_token(Lexer* lexer) {
 
         if (lexer->offset == lexer->input_size) return lexer->token = T_END;
 
-        if(!something_was_done) break;
+        if (!something_was_done) break;
     }
 
     lexer->token_text = &lexer->input_buffer[lexer->offset];
@@ -102,6 +102,28 @@ Token lexer_next_token(Lexer* lexer) {
         if (lexer->token_len == 3 &&
             strncmp("i32", lexer->token_text, lexer->token_len) == 0) {
             return lexer->token = KW_i32;
+        }
+        if (lexer->token_len == 4 &&
+            strncmp("bool", lexer->token_text, lexer->token_len) == 0) {
+            return lexer->token = KW_bool;
+        }
+        if (lexer->token_len == 3 &&
+            strncmp("and", lexer->token_text, lexer->token_len) == 0) {
+            return lexer->token = KW_AND;
+        }
+        if (lexer->token_len == 2 &&
+            strncmp("or", lexer->token_text, lexer->token_len) == 0) {
+            return lexer->token = KW_OR;
+        }
+        if (lexer->token_len == 4 &&
+            strncmp("true", lexer->token_text, lexer->token_len) == 0) {
+            lexer->token_bool = true;
+            return lexer->token = T_BOOL;
+        }
+        if (lexer->token_len == 5 &&
+            strncmp("false", lexer->token_text, lexer->token_len) == 0) {
+            lexer->token_bool = false;
+            return lexer->token = T_BOOL;
         }
 
         return lexer->token = T_IDENT;
@@ -139,6 +161,10 @@ Token lexer_next_token(Lexer* lexer) {
                 return lexer->token = T_SEMICOLON;
             case '=':
                 lexer_consume_char(lexer);
+                if (lexer_current_char(lexer) == '=') {
+                    lexer_consume_char(lexer);
+                    return lexer->token = T_EQUAL;
+                }
                 return lexer->token = T_ASSIGN;
             case ',':
                 lexer_consume_char(lexer);

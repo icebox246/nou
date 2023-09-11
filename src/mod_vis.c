@@ -24,6 +24,9 @@ void visualize_value_type(ValueType vt, Visualizer* v) {
         case VT_I32:
             fprintf(v->file, "i32");
             break;
+        case VT_BOOL:
+            fprintf(v->file, "bool");
+            break;
     }
 }
 
@@ -34,6 +37,11 @@ void visualize_expr(Expr* e, Visualizer* v) {
         case EK_I32_CONST:
             vis_write_indent(v);
             fprintf(v->file, "i32_const %d\n", e->props.i32);
+            break;
+        case EK_BOOL_CONST:
+            vis_write_indent(v);
+            fprintf(v->file, "bool_const %s\n",
+                    e->props.boolean ? "true" : "false");
             break;
         case EK_VAR:
             vis_write_indent(v);
@@ -60,6 +68,15 @@ void visualize_expr(Expr* e, Visualizer* v) {
                     break;
                 case OP_ASSIGNEMENT:
                     fprintf(v->file, "=");
+                    break;
+                case OP_EQUALITY:
+                    fprintf(v->file, "==");
+                    break;
+                case OP_ALTERNATIVE:
+                    fprintf(v->file, "or");
+                    break;
+                case OP_CONJUNCTION:
+                    fprintf(v->file, "and");
                     break;
 
                 case OP_OPEN_PAREN:

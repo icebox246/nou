@@ -21,6 +21,8 @@ const {
     expressions3,
     functions,
     external_functions,
+    boolean_values,
+    boolean_values2,
 } = module.instance.exports;
 
 function runTests(tests) {
@@ -79,5 +81,13 @@ runTests({
     external_functions: {
         expr: () => external_functions(),
         expected: 42,
+    },
+    boolean_values: {
+        expr: () => boolean_values(42),
+        expected: 1,
+    },
+    boolean_values2: {
+        expr: () => boolean_values2(36),
+        expected: 1,
     },
 });

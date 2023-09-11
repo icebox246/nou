@@ -3,14 +3,17 @@
 
 #include <stddef.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 typedef enum {
     T_END = 0,
     T_IDENT,
     T_INT,
+    T_BOOL,
     T_COLON,
     T_SEMICOLON,
     T_ASSIGN,
+    T_EQUAL,
     T_COMMA,
     T_ARROW,
     T_DECLARE,
@@ -28,8 +31,11 @@ typedef enum {
     KW_EXPORT,
     KW_EXTERN,
     KW_RETURN,
+    KW_AND,
+    KW_OR,
 
     KW_i32,
+    KW_bool,
 } Token;
 
 typedef struct {
@@ -45,6 +51,7 @@ typedef struct {
     char* token_text;
     size_t token_len;
     int64_t token_int;
+    bool token_bool;
     Location token_start_loc;
     Location token_end_loc;
 } Lexer;
