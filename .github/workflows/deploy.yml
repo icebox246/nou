@@ -30,7 +30,7 @@ jobs:
       - name: Build wasm binaries
         run: make demo -B
         env: 
-          WASI_SDK_PATH: ./wasi-sdk-20.0/
+          WASI_SDK_DIR: ./wasi-sdk-20.0/
 
       - name: Build Vite app
         working-directory: demo
