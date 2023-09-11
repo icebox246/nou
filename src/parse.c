@@ -153,6 +153,8 @@ bool parse_function_type(Parser* p, Function* f) {
 size_t operator_precedence(OperatorKind op) {
     switch (op) {
         case OP_MULTIPLICATION:
+        case OP_REMAINDER:
+        case OP_DIVISION:
             return 3;
         case OP_ADDITION:
         case OP_SUBTRACTION:
@@ -176,6 +178,8 @@ size_t operator_associativity(OperatorKind op) {
         case OP_ADDITION:
         case OP_SUBTRACTION:
         case OP_MULTIPLICATION:
+        case OP_REMAINDER:
+        case OP_DIVISION:
             return OPA_LEFT;
 
         case OP_ASSIGNEMENT:
@@ -197,6 +201,10 @@ OperatorKind operator_of_token(Token tok) {
             return OP_ADDITION;
         case T_STAR:
             return OP_MULTIPLICATION;
+        case T_PERCENT:
+            return OP_REMAINDER;
+        case T_SLASH:
+            return OP_DIVISION;
         default:
             return -1;
     }

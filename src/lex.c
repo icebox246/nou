@@ -168,8 +168,14 @@ Token lexer_next_token(Lexer* lexer) {
             case '*':
                 lexer_consume_char(lexer);
                 return lexer->token = T_STAR;
+            case '%':
+                lexer_consume_char(lexer);
+                return lexer->token = T_PERCENT;
+            case '/':
+                lexer_consume_char(lexer);
+                return lexer->token = T_SLASH;
             default:
-                fprintf(stderr, "%d:%d: Unknown token starting with: '%c'",
+                fprintf(stderr, "%d:%d: Unknown token starting with: '%c'\n",
                         (int)lexer->token_start_loc.line,
                         (int)lexer->token_start_loc.col,
                         lexer_current_char(lexer));

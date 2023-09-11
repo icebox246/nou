@@ -303,6 +303,16 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
                            decision.right_type == VT_I32);
                     da_append(e, 0x6C);  // opcode for i32.mul
                     break;
+                case OP_REMAINDER:
+                    assert(decision.left_type == VT_I32 &&
+                           decision.right_type == VT_I32);
+                    da_append(e, 0x6F);  // opcode for i32.rem_s
+                    break;
+                case OP_DIVISION:
+                    assert(decision.left_type == VT_I32 &&
+                           decision.right_type == VT_I32);
+                    da_append(e, 0x6D);  // opcode for i32.div_s
+                    break;
                 case OP_ASSIGNEMENT: {  // TODO figure out which instruction
                                         // should be codegenned base on type
                                         // stack
@@ -391,7 +401,9 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
                 switch (e->props.op) {
                     case OP_ADDITION:
                     case OP_SUBTRACTION:
-                    case OP_MULTIPLICATION: {
+                    case OP_MULTIPLICATION:
+                    case OP_REMAINDER:
+                    case OP_DIVISION: {
                         index_stack.count -= 2;
                         type_stack.count -= 2;
 

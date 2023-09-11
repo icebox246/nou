@@ -7,6 +7,7 @@ export nop;
 export variables;
 export expressions;
 export expressions2;
+export expressions3;
 export functions;
 export external_functions;
 
@@ -49,6 +50,12 @@ expressions := fn -> i32 {
 // tests parentheses
 expressions2 := fn -> i32 {
     a := i32 2 * (20 + 1); 
+    return a;
+};
+
+// test division and remainder
+expressions3 := fn -> i32 {
+    a := i32 (10 % 20) * 8 / 2 + 5 % 3; 
     return a;
 };
 

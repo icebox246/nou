@@ -52,6 +52,12 @@ void visualize_expr(Expr* e, Visualizer* v) {
                 case OP_MULTIPLICATION:
                     fprintf(v->file, "*");
                     break;
+                case OP_REMAINDER:
+                    fprintf(v->file, "%%");
+                    break;
+                case OP_DIVISION:
+                    fprintf(v->file, "/");
+                    break;
                 case OP_ASSIGNEMENT:
                     fprintf(v->file, "=");
                     break;

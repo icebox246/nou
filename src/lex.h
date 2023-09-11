@@ -17,6 +17,8 @@ typedef enum {
     T_MINUS,
     T_PLUS,
     T_STAR,
+    T_PERCENT,
+    T_SLASH,
     T_OPEN_BRACKETS,
     T_CLOSE_BRACKETS,
     T_OPEN_PARENS,

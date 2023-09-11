@@ -28,6 +28,8 @@ syn match NOUOperator "="
 syn match NOUOperator "+"
 syn match NOUOperator "-" 
 syn match NOUOperator "*"
+syn match NOUOperator "/"
+syn match NOUOperator "%"
 highligh link NOUOperator Operator
 
 syn match NOUDelimiter ":"
