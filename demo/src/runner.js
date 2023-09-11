@@ -6,6 +6,9 @@ export class Runner {
             log_int: (x) => {
                 this.output.push(x);
             },
+            log_bool: (b) => {
+                this.output.push(b ? "true" : "false");
+            },
             get_int: (def) => {
                 return Number.parseInt(prompt("NoU asks for a number", def));
             }
