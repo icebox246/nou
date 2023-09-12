@@ -12,6 +12,7 @@ export functions;
 export external_functions;
 export boolean_values;
 export boolean_values2;
+export if_statement;
 
 // adds two numbers 
 add := fn a: i32, b: i32 -> i32 {
@@ -79,14 +80,23 @@ external_functions := fn -> i32 {
     return log_int(42);
 };
 
+// tests calculating basic boolean value
 boolean_values := fn n: i32 -> bool {
-   is_even := bool;
-   is_even = n % 2 == 0;
-   return is_even;
+    is_even := bool;
+    is_even = n % 2 == 0;
+    return is_even;
 };
 
+// tests boolean constants and boolean operators
 boolean_values2 := fn n: i32 -> bool {
-   is_divisible_by_6 := bool true or false;
-   is_divisible_by_6 = (6 % 3 == 0 and 6 % 2 == 0);
-   return is_divisible_by_6;
+    is_divisible_by_6 := bool true or false;
+    is_divisible_by_6 = (6 % 3 == 0 and 6 % 2 == 0);
+    return is_divisible_by_6;
+};
+
+// tests basic usage of if statements
+if_statement := fn n: i32 -> i32 {
+    if (n % 2 == 0)
+        return 2;
+    return 1;
 };

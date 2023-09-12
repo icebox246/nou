@@ -567,8 +567,24 @@ ByteBuffer codegen_return_statement(Module* mod, ReturnStatement* st,
                                     size_t scope) {
     // TODO make sure correct value gets returned
     ByteBuffer ret = codegen_expression(mod, &st->expr, scope, NULL);
-    da_append(ret, 0x0F);  // return op code
+    da_append(ret, 0x0F);  // opcode for return
     return ret;
+}
+
+ByteBuffer codegen_if_statement(Module* mod, IfStatement* st, size_t scope) {
+    ValueType cond_vt;
+    ByteBuffer ifs = codegen_expression(mod, &st->cond_expr, scope, &cond_vt);
+    assert(cond_vt == VT_BOOL && "Condition of if statement must be a boolean");
+    da_append(ifs, 0x04);  // opcode for if
+    da_append(ifs, 0x40);  // opcode for nil result type
+    {
+        ByteBuffer positive_branch =
+            codegen_statement(mod, st->positive_branch, scope);
+        bb_append_bb(&ifs, &positive_branch);
+        free(positive_branch.items);
+    }
+    da_append(ifs, 0x0B);  // opcode for end
+    return ifs;
 }
 
 ByteBuffer codegen_expr_statement(Module* mod, ExpressionStatement* st,
@@ -589,6 +605,8 @@ ByteBuffer codegen_statement(Module* mod, Statement* st, size_t scope) {
             return codegen_block_statement(mod, &st->block, scope);
         case SK_RETURN:
             return codegen_return_statement(mod, &st->ret, scope);
+        case SK_IF:
+            return codegen_if_statement(mod, &st->ifs, scope);
         case SK_EXPRESSION:
             return codegen_expr_statement(mod, &st->expr, scope);
     }
@@ -799,6 +817,7 @@ Section codegen_exports(Module* mod) {
 
     for (size_t i = 0; i < mod->exports.count; i++) {
         Decl* decl = find_global_decl(mod, mod->exports.items[i].decl_name);
+        assert(decl && "Cannot export undeclared function");
         if (decl->kind != DK_FUNCTION) {
             fprintf(stderr, "Unsupported export decl kind %d!\n", decl->kind);
             exit(1);

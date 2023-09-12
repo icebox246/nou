@@ -1,9 +1,10 @@
 #ifndef LEX_H_
 #define LEX_H_
 
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdbool.h>
+#include <stdio.h>
 
 typedef enum {
     T_END = 0,
@@ -28,6 +29,7 @@ typedef enum {
     T_CLOSE_PARENS,
 
     KW_FN,
+    KW_IF,
     KW_EXPORT,
     KW_EXTERN,
     KW_RETURN,
@@ -58,5 +60,7 @@ typedef struct {
 
 Token lexer_next_token(Lexer* lexer);
 void lexer_undo_token(Lexer* lexer);
+
+void loc_print(FILE*, Location);
 
 #endif

@@ -23,6 +23,7 @@ const {
     external_functions,
     boolean_values,
     boolean_values2,
+    if_statement,
 } = module.instance.exports;
 
 function runTests(tests) {
@@ -88,6 +89,14 @@ runTests({
     },
     boolean_values2: {
         expr: () => boolean_values2(36),
+        expected: 1,
+    },
+    if_statement_positive: {
+        expr: () => if_statement(20),
+        expected: 2,
+    },
+    if_statement_negative: {
+        expr: () => if_statement(21),
         expected: 1,
     },
 });

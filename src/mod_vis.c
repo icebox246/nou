@@ -140,6 +140,22 @@ void visualize_return_statement(ReturnStatement* s, Visualizer* v) {
     fprintf(v->file, "}\n");
 }
 
+void visualize_if_statement(IfStatement* s, Visualizer* v) {
+    vis_write_indent(v);
+    fprintf(v->file, "if (\n");
+
+    v->indent++;
+    visualize_expression(&s->cond_expr, v);
+    v->indent--;
+
+    vis_write_indent(v);
+    fprintf(v->file, ")\n");
+
+    v->indent++;
+    visualize_statement(s->positive_branch, v);
+    v->indent--;
+}
+
 void visualize_expr_statement(ReturnStatement* s, Visualizer* v) {
     vis_write_indent(v);
     fprintf(v->file, "expr {\n");
@@ -162,6 +178,9 @@ void visualize_statement(Statement* s, Visualizer* v) {
             break;
         case SK_RETURN:
             visualize_return_statement(&s->ret, v);
+            break;
+        case SK_IF:
+            visualize_if_statement(&s->ifs, v);
             break;
         case SK_EXPRESSION:
             visualize_expr_statement(&s->ret, v);

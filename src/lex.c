@@ -86,6 +86,10 @@ Token lexer_next_token(Lexer* lexer) {
             strncmp("fn", lexer->token_text, lexer->token_len) == 0) {
             return lexer->token = KW_FN;
         }
+        if (lexer->token_len == 2 &&
+            strncmp("if", lexer->token_text, lexer->token_len) == 0) {
+            return lexer->token = KW_IF;
+        }
         if (lexer->token_len == 6 &&
             strncmp("export", lexer->token_text, lexer->token_len) == 0) {
             return lexer->token = KW_EXPORT;
@@ -212,4 +216,8 @@ Token lexer_next_token(Lexer* lexer) {
 void lexer_undo_token(Lexer* lexer) {
     lexer->token_end_loc = lexer->token_start_loc;
     lexer->offset -= lexer->token_len;
+}
+
+void loc_print(FILE* fd, Location loc) {
+    fprintf(fd, "%zu:%zu: ", loc.line, loc.col);
 }

@@ -7,7 +7,7 @@
 syn match NOUNumber /\<[0-9]\+\>/
 highligh link NOUNumber Number
 
-syn keyword NOUKeyword export extern fn return 
+syn keyword NOUKeyword export extern fn return if
 highligh link NOUKeyword Keyword
 
 syn keyword NOUType i32 bool

@@ -18,6 +18,7 @@ bool parse_value_type(Parser* p, ValueType* vt) {
             *vt = VT_BOOL;
             break;
         default:
+            loc_print(stderr, p->lex->token_start_loc);
             fprintf(stderr, "Unexpected token in value type %d!\n", token);
             return false;
     }
@@ -91,12 +92,14 @@ bool parse_function_type(Parser* p, Function* f) {
     while ((token = lexer_next_token(p->lex)) != T_ARROW &&
            token != T_OPEN_BRACKETS) {
         if (token != T_IDENT) {
+            loc_print(stderr, p->lex->token_start_loc);
             fprintf(stderr, "Expected param name identifier, got %d!\n", token);
             return false;
         }
         Decl param = {0};
         param.name = strndup(p->lex->token_text, p->lex->token_len);
         if (!check_decl_name_available(p, param.name)) {
+            loc_print(stderr, p->lex->token_start_loc);
             fprintf(stderr, "Redeclaration of `%s` in param!\n", param.name);
             return false;
         }
@@ -105,11 +108,13 @@ bool parse_function_type(Parser* p, Function* f) {
         token = lexer_next_token(p->lex);
 
         if (token != T_COLON) {
+            loc_print(stderr, p->lex->token_start_loc);
             fprintf(stderr, "Expected colon, got %d!\n", token);
             return false;
         }
 
         if (!parse_value_type(p, (ValueType*)&param.value)) {
+            loc_print(stderr, p->lex->token_start_loc);
             fprintf(stderr, "Failed to parse param type!\n");
             return false;
         }
@@ -123,6 +128,7 @@ bool parse_function_type(Parser* p, Function* f) {
                 token == T_SEMICOLON)
                 break;
 
+            loc_print(stderr, p->lex->token_start_loc);
             fprintf(stderr,
                     "Expected comma, arrow, semicolon or '{', got %d!\n",
                     token);
@@ -134,6 +140,7 @@ bool parse_function_type(Parser* p, Function* f) {
 
     if (token == T_ARROW) {
         if (!parse_value_type(p, &f->return_type)) {
+            loc_print(stderr, p->lex->token_start_loc);
             fprintf(stderr, "Failed to parse return type!\n");
             return false;
         }
@@ -247,13 +254,17 @@ bool parse_expression(Parser* p, Expression* ex,
         da_list(char*);
     } func_name_stack = {0};
 
-    while (true) {
+    bool parsing = true;
+
+    while (parsing) {
         Token token = lexer_next_token(p->lex);
         if (token == T_SEMICOLON && termination_mode == EPTM_DEFAULT) {
             lexer_undo_token(p->lex);
+            parsing = false;
             break;
         }
-        {
+
+        {  // parse potential ops
             OperatorKind new_op = operator_of_token(token);
             if (new_op != -1) {
                 OperatorKind top_op;
@@ -276,31 +287,39 @@ bool parse_expression(Parser* p, Expression* ex,
                 continue;
             }
         }
+
         switch (token) {
             case T_OPEN_PARENS: {
                 da_append(op_stack, OP_OPEN_PAREN);
             } break;
             case T_CLOSE_PARENS: {
-                if (op_stack.count == 0) {
-                    if (termination_mode == EPTM_ON_MISMATCHED_PAREN) {
-                        lexer_undo_token(p->lex);
-                        break;
-                    } else {
-                        fprintf(stderr, "Mismatched parenthesis!\n");
-                        return false;
-                    }
-                }
-                while (op_stack.items[op_stack.count - 1] != OP_OPEN_PAREN) {
-                    if (op_stack.count == 0) {
-                        fprintf(stderr, "Mismatched parenthesis!\n");
-                        return false;
-                    }
+                bool mismatched_paren = false;
+                if (op_stack.count == 0) mismatched_paren = true;
+
+                while (!mismatched_paren && op_stack.count > 0 &&
+                       op_stack.items[op_stack.count - 1] != OP_OPEN_PAREN) {
                     Expr e = {
                         .kind = EK_OPERATOR,
                         .props.op = op_stack.items[op_stack.count - 1],
                     };
                     da_append(*ex, e);
                     op_stack.count--;
+                    if (op_stack.count == 0) {
+                        mismatched_paren = true;
+                        break;
+                    }
+                }
+
+                if (mismatched_paren) {
+                    if (termination_mode == EPTM_ON_MISMATCHED_PAREN) {
+                        lexer_undo_token(p->lex);
+                        parsing = false;
+                        break;
+                    } else {
+                        loc_print(stderr, p->lex->token_start_loc);
+                        fprintf(stderr, "Mismatched parenthesis!\n");
+                        return false;
+                    }
                 }
 
                 assert(op_stack.items[op_stack.count - 1] == OP_OPEN_PAREN);
@@ -355,13 +374,12 @@ bool parse_expression(Parser* p, Expression* ex,
                         .kind = EK_OPERATOR,
                         .props.op = op_stack.items[op_stack.count - 1],
                     };
-                    fprintf(stderr, "FOO: %d\n",
-                            op_stack.items[op_stack.count - 1]);
                     da_append(*ex, e);
                     op_stack.count--;
                 }
             } break;
             default:
+                loc_print(stderr, p->lex->token_start_loc);
                 fprintf(stderr, "Unexpected token in expression %d: `%.*s`!\n",
                         token, (int)p->lex->token_len, p->lex->token_text);
                 return false;
@@ -385,6 +403,7 @@ bool parse_expression(Parser* p, Expression* ex,
 
 bool parse_decl_statement(Parser* p, ExpressionStatement* st, char* decl_name) {
     if (!check_decl_name_available(p, decl_name)) {
+        loc_print(stderr, p->lex->token_start_loc);
         fprintf(stderr, "Redeclaration of `%s`!\n", decl_name);
         return false;
     }
@@ -396,6 +415,7 @@ bool parse_decl_statement(Parser* p, ExpressionStatement* st, char* decl_name) {
     Token token = lexer_next_token(p->lex);
 
     if (token != T_DECLARE) {
+        loc_print(stderr, p->lex->token_start_loc);
         fprintf(stderr, "Expected declare operator, got %d!\n", token);
         return false;
     }
@@ -407,11 +427,13 @@ bool parse_decl_statement(Parser* p, ExpressionStatement* st, char* decl_name) {
             Function f = {0};
             size_t old_scope = p->current_scope;
             if (!parse_function_type(p, &f)) {
+                loc_print(stderr, p->lex->token_start_loc);
                 fprintf(stderr, "Failed to parse function type!\n");
                 return false;
             }
             p->current_scope = f.param_scope;
             if (!parse_statement(p, &f.content)) {
+                loc_print(stderr, p->lex->token_start_loc);
                 fprintf(stderr, "Failed to parse function content!\n");
                 return false;
             }
@@ -424,6 +446,7 @@ bool parse_decl_statement(Parser* p, ExpressionStatement* st, char* decl_name) {
             lexer_undo_token(p->lex);
             d->kind = DK_VARIABLE;
             if (!parse_value_type(p, (ValueType*)&d->value)) {
+                loc_print(stderr, p->lex->token_start_loc);
                 fprintf(stderr, "Failed to parse variable type!\n");
                 return false;
             }
@@ -437,6 +460,7 @@ bool parse_decl_statement(Parser* p, ExpressionStatement* st, char* decl_name) {
                     da_append(st->expr, e);
                 }
                 if (!parse_expression(p, &st->expr, EPTM_DEFAULT)) {
+                    loc_print(stderr, p->lex->token_start_loc);
                     fprintf(stderr,
                             "Failed to parse initialization expression!\n");
                     return false;
@@ -457,6 +481,7 @@ bool parse_decl_statement(Parser* p, ExpressionStatement* st, char* decl_name) {
 
     token = lexer_next_token(p->lex);
     if (token != T_SEMICOLON) {
+        loc_print(stderr, p->lex->token_start_loc);
         fprintf(stderr, "Expected semicolon after decl, got %d!\n", token);
         return false;
     }
@@ -476,6 +501,7 @@ bool parse_export_statement(Parser* p) {
             da_append(p->mod->exports, ex);
         } break;
         default:
+            loc_print(stderr, p->lex->token_start_loc);
             fprintf(stderr, "Unexpected token export statement %d!\n", token);
             return false;
     }
@@ -483,6 +509,7 @@ bool parse_export_statement(Parser* p) {
     token = lexer_next_token(p->lex);
 
     if (token != T_SEMICOLON) {
+        loc_print(stderr, p->lex->token_start_loc);
         fprintf(stderr, "Expected semicolon after export statement %d!\n",
                 token);
         return false;
@@ -503,12 +530,14 @@ bool parse_extern_statement(Parser* p) {
             name = strndup(p->lex->token_text, p->lex->token_len);
             break;
         default:
+            loc_print(stderr, p->lex->token_start_loc);
             fprintf(stderr, "Unexpected token extern statement, got %d!\n",
                     token);
             return false;
     }
 
     if (!check_decl_name_available(p, name)) {
+        loc_print(stderr, p->lex->token_start_loc);
         fprintf(stderr, "Redeclaration of `%s` in extern!\n", name);
         return false;
     }
@@ -520,6 +549,7 @@ bool parse_extern_statement(Parser* p) {
     token = lexer_next_token(p->lex);
 
     if (token != T_DECLARE) {
+        loc_print(stderr, p->lex->token_start_loc);
         fprintf(stderr, "Expected `:=` after extern statement, got %d!\n",
                 token);
         return false;
@@ -528,6 +558,7 @@ bool parse_extern_statement(Parser* p) {
     token = lexer_next_token(p->lex);
 
     if (token != KW_FN) {
+        loc_print(stderr, p->lex->token_start_loc);
         fprintf(stderr, "Extern supports only function, got %d!\n", token);
         return false;
     }
@@ -535,6 +566,7 @@ bool parse_extern_statement(Parser* p) {
     Function f = {0};
 
     if (!parse_function_type(p, &f)) {
+        loc_print(stderr, p->lex->token_start_loc);
         fprintf(stderr, "Failed to parse function type in extern!\n");
         return false;
     }
@@ -542,6 +574,7 @@ bool parse_extern_statement(Parser* p) {
     token = lexer_next_token(p->lex);
 
     if (token != T_SEMICOLON) {
+        loc_print(stderr, p->lex->token_start_loc);
         fprintf(stderr, "Expected semicolon after extern statement %d!\n",
                 token);
         return false;
@@ -565,6 +598,7 @@ bool parse_block_statement(Parser* p, BlockStatement* st) {
         lexer_undo_token(p->lex);
         da_append(*st, (Statement){0});
         if (!parse_statement(p, &st->items[st->count - 1])) {
+            loc_print(stderr, p->lex->token_start_loc);
             fprintf(stderr, "Failed to parse statement in block!\n");
             return false;
         }
@@ -578,14 +612,50 @@ bool parse_block_statement(Parser* p, BlockStatement* st) {
 bool parse_return_statement(Parser* p, ReturnStatement* st) {
     st->kind = SK_RETURN;
     if (!parse_expression(p, &st->expr, EPTM_DEFAULT)) {
+        loc_print(stderr, p->lex->token_start_loc);
         fprintf(stderr, "Failed to expression in return statement!\n");
         return false;
     }
 
     Token token = lexer_next_token(p->lex);
     if (token != T_SEMICOLON) {
+        loc_print(stderr, p->lex->token_start_loc);
         fprintf(stderr, "Expected semicolon after return statement, got %d!\n",
                 token);
+        return false;
+    }
+
+    return true;
+}
+
+bool parse_if_statement(Parser* p, IfStatement* st) {
+    st->kind = SK_IF;
+
+    if (lexer_next_token(p->lex) != T_OPEN_PARENS) {
+        loc_print(stderr, p->lex->token_start_loc);
+        fprintf(stderr, "Expected `(` after `if`!\n");
+        return false;
+    }
+
+    if (!parse_expression(p, &st->cond_expr, EPTM_ON_MISMATCHED_PAREN)) {
+        loc_print(stderr, p->lex->token_start_loc);
+        fprintf(stderr, "Failed to parse condition in if statement!\n");
+        return false;
+    }
+
+    if (lexer_next_token(p->lex) != T_CLOSE_PARENS) {
+        loc_print(stderr, p->lex->token_start_loc);
+        fprintf(stderr, "Expected `)` after `if` condition!\n");
+        return false;
+    }
+
+    st->positive_branch = malloc(sizeof(Statement));
+    memset(st->positive_branch, 0, sizeof(Statement));
+    assert(st->positive_branch);
+
+    if (!parse_statement(p, st->positive_branch)) {
+        loc_print(stderr, p->lex->token_start_loc);
+        fprintf(stderr, "Failed to parse positive branch of if statement!\n");
         return false;
     }
 
@@ -595,6 +665,7 @@ bool parse_return_statement(Parser* p, ReturnStatement* st) {
 bool parse_expr_statement(Parser* p, ExpressionStatement* st) {
     st->kind = SK_EXPRESSION;
     if (!parse_expression(p, &st->expr, EPTM_DEFAULT)) {
+        loc_print(stderr, p->lex->token_start_loc);
         fprintf(stderr,
                 "Failed to parse expression in expression statement!\n");
         return false;
@@ -602,6 +673,7 @@ bool parse_expr_statement(Parser* p, ExpressionStatement* st) {
 
     Token token = lexer_next_token(p->lex);
     if (token != T_SEMICOLON) {
+        loc_print(stderr, p->lex->token_start_loc);
         fprintf(stderr,
                 "Expected semicolon after expression statement, got %d!\n",
                 token);
@@ -618,17 +690,27 @@ bool parse_statement(Parser* p, Statement* st) {
     switch (token) {
         case T_OPEN_BRACKETS:
             if (!parse_block_statement(p, &st->block)) {
+                loc_print(stderr, p->lex->token_start_loc);
                 fprintf(stderr, "Failed to parse block statement!\n");
                 return false;
             }
             break;
         case KW_RETURN:
             if (!parse_return_statement(p, &st->ret)) {
+                loc_print(stderr, p->lex->token_start_loc);
+                fprintf(stderr, "Failed to parse return statement!\n");
+                return false;
+            }
+            break;
+        case KW_IF:
+            if (!parse_if_statement(p, &st->ifs)) {
+                loc_print(stderr, p->lex->token_start_loc);
                 fprintf(stderr, "Failed to parse return statement!\n");
                 return false;
             }
             break;
         case T_SEMICOLON:
+            loc_print(stderr, p->lex->token_start_loc);
             fprintf(stderr, "WARN:%zu:%zu: Extreanous semicolon!\n",
                     p->lex->token_start_loc.line, p->lex->token_start_loc.col);
             break;
@@ -638,6 +720,7 @@ bool parse_statement(Parser* p, Statement* st) {
             if (lexer_next_token(p->lex) == T_DECLARE) {
                 *p->lex = backup;
                 if (!parse_decl_statement(p, &st->expr, name)) {
+                    loc_print(stderr, p->lex->token_start_loc);
                     fprintf(stderr, "Failed to parse local decl statement!\n");
                     return false;
                 }
@@ -646,12 +729,14 @@ bool parse_statement(Parser* p, Statement* st) {
                 *p->lex = backup;
                 lexer_undo_token(p->lex);
                 if (!parse_expr_statement(p, &st->expr)) {
+                    loc_print(stderr, p->lex->token_start_loc);
                     fprintf(stderr, "Failed to parse expr statement!\n");
                     return false;
                 }
             }
         } break;
         default:
+            loc_print(stderr, p->lex->token_start_loc);
             fprintf(stderr, "Unexpected at beginning of statement %d: %.*s!\n",
                     token, (int)p->lex->token_len, p->lex->token_text);
             return false;
@@ -679,6 +764,7 @@ bool parse_global_scope(Parser* p) {
                     return false;
                 break;
             default:
+                loc_print(stderr, p->lex->token_start_loc);
                 fprintf(stderr, "Unexpected token in global scope %d!\n",
                         token);
                 return false;
@@ -694,6 +780,7 @@ Module parse(Lexer* lexer) {
     da_append(mod.scopes, (DeclScope){0});
 
     if (!parse_global_scope(&parser)) {
+        loc_print(stderr, lexer->token_start_loc);
         fprintf(stderr, "Failed to parse global scope!\n");
         exit(-1);
     }

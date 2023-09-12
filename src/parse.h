@@ -94,6 +94,7 @@ typedef enum {
     SK_EMPTY,
     SK_BLOCK,
     SK_RETURN,
+    SK_IF,
     SK_EXPRESSION,
 } StatementKind;
 
@@ -115,10 +116,17 @@ typedef union Statement {
         da_list(union Statement);
     } block;
     ReturnStatement ret;
+    struct IfStatement {
+        StatementKind kind;
+        Expression cond_expr;
+        union Statement* positive_branch;
+    } ifs;
     ExpressionStatement expr;
 } Statement;
 
 typedef struct BlockStatement BlockStatement;
+
+typedef struct IfStatement IfStatement;
 
 // function types
 
