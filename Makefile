@@ -1,5 +1,6 @@
 CC = clang
 WASI_CC = ${WASI_SDK_DIR}/bin/clang
+JS = node
 
 SOURCES += src/u.c
 SOURCES += src/lex.c
@@ -16,8 +17,15 @@ HEADERS += src/da.h
 u: ${SOURCES} ${HEADERS}
 	${CC} ${SOURCES} -o $@ -ggdb
 
-demo: 
+demo_wasi: ${WASI_SDK_DIR}
+ifndef WASI_SDK_DIR
+	@echo "You must provide WASI_SDK_DIR"
+	@exit 1
+else
 	${WASI_CC} ${SOURCES} -o demo/public/u.wasm
+endif
 
 test: u
-	cd tests && ../u ${UFLAGS} test.u && node test.mjs 
+	./u ${UFLAGS} demo/src/example.u
+	./u ${UFLAGS} tests/test.u
+	${JS} tests/test.mjs

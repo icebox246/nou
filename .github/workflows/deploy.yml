@@ -28,7 +28,7 @@ jobs:
           tar xzf wasi-sdk-20.0-linux.tar.gz
 
       - name: Build wasm binaries
-        run: make demo -B
+        run: make demo_wasi -B
         env: 
           WASI_SDK_DIR: ./wasi-sdk-20.0/
 
