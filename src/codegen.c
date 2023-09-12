@@ -583,6 +583,13 @@ ByteBuffer codegen_if_statement(Module* mod, IfStatement* st, size_t scope) {
         bb_append_bb(&ifs, &positive_branch);
         free(positive_branch.items);
     }
+    if (st->negative_branch) {  // has else clause
+        da_append(ifs, 0x05);   // opcode for else
+        ByteBuffer negative_branch =
+            codegen_statement(mod, st->negative_branch, scope);
+        bb_append_bb(&ifs, &negative_branch);
+        free(negative_branch.items);
+    }
     da_append(ifs, 0x0B);  // opcode for end
     return ifs;
 }

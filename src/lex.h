@@ -30,6 +30,7 @@ typedef enum {
 
     KW_FN,
     KW_IF,
+    KW_ELSE,
     KW_EXPORT,
     KW_EXTERN,
     KW_RETURN,

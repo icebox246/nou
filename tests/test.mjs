@@ -24,6 +24,7 @@ const {
     boolean_values,
     boolean_values2,
     if_statement,
+    if_else_statement,
 } = module.instance.exports;
 
 function runTests(tests) {
@@ -97,6 +98,14 @@ runTests({
     },
     if_statement_negative: {
         expr: () => if_statement(21),
+        expected: 1,
+    },
+    if_else_statement_positive: {
+        expr: () => if_else_statement(20),
+        expected: 1,
+    },
+    if_else_statement_negative: {
+        expr: () => if_else_statement(21),
         expected: 1,
     },
 });

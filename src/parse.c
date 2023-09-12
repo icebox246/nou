@@ -659,6 +659,21 @@ bool parse_if_statement(Parser* p, IfStatement* st) {
         return false;
     }
 
+    if (lexer_next_token(p->lex) == KW_ELSE) {
+        st->negative_branch = malloc(sizeof(Statement));
+        memset(st->negative_branch, 0, sizeof(Statement));
+        assert(st->negative_branch);
+
+        if (!parse_statement(p, st->negative_branch)) {
+            loc_print(stderr, p->lex->token_start_loc);
+            fprintf(stderr,
+                    "Failed to parse negative branch of if statement!\n");
+            return false;
+        }
+    } else {
+        lexer_undo_token(p->lex);
+    }
+
     return true;
 }
 

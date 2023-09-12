@@ -120,6 +120,7 @@ typedef union Statement {
         StatementKind kind;
         Expression cond_expr;
         union Statement* positive_branch;
+        union Statement* negative_branch;
     } ifs;
     ExpressionStatement expr;
 } Statement;

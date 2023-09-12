@@ -90,6 +90,10 @@ Token lexer_next_token(Lexer* lexer) {
             strncmp("if", lexer->token_text, lexer->token_len) == 0) {
             return lexer->token = KW_IF;
         }
+        if (lexer->token_len == 4 &&
+            strncmp("else", lexer->token_text, lexer->token_len) == 0) {
+            return lexer->token = KW_ELSE;
+        }
         if (lexer->token_len == 6 &&
             strncmp("export", lexer->token_text, lexer->token_len) == 0) {
             return lexer->token = KW_EXPORT;
