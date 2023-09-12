@@ -1,10 +1,22 @@
 @import url('https://fonts.googleapis.com/css2?family=Fira+Code&display=swap');
 
 :root {
-    --bg:  #202020;
+    --bg-dark:  #0A0A0D;
+    --bg:  var(--bg-dark);
     --bg2: #2D282E;
     --ac:  #D3B9F9;
     --fg:  #EFEFEF;
+
+    --hi-normal: #DCD7BA;
+    --hi-selection: #223249;
+    --hi-number: #D27E99;
+    --hi-keyword: #957FB8;
+    --hi-type: #7AA89F;
+    --hi-boolean: #FFA066;
+    --hi-function: #7E9CD8;
+    --hi-operator: #C0A36E;
+    --hi-delimiter: #9CABCA;
+    --hi-comment: #727169;
 }
 
 @media (prefers-color-scheme: light) {
@@ -46,15 +58,79 @@ main {
     overflow-y: auto;
 }
 
-.code-editor {
+.code-editor-container {
     flex: 1;
-    display: block;
     background: var(--bg);
+    display: flex;
     outline: 0;
-    padding: 1em;
     border: var(--ac) 1px solid;
     border-radius: 0.2em;
+    position: relative;
+    background: var(--bg-dark);
+    overflow: auto;
+}
+
+.code-editor-textarea::selection {
+    background: var(--hi-selection);
+}
+.code-editor-textarea {
+    flex: 1;
+    position: absolute;
+    width: 100%;
+    display: block;
+    outline: 0;
+    padding: 1em;
     resize: none;
+    background: none;
+    border: none;
+    color: transparent;
+    caret-color: var(--hi-normal);
+    overflow: hidden;
+}
+
+.code-editor-highlighted {
+    position: absolute;
+    display: block;
+    padding: 1em;
+    white-space: pre;
+    pointer-events: none;
+    color: var(--hi-normal);
+}
+
+.ünu {
+    color: var(--hi-number);
+}
+
+.ükw {
+    color: var(--hi-keyword);
+}
+
+.üty {
+    color: var(--hi-type);
+}
+
+.übo {
+    color: var(--hi-boolean);
+}
+
+.üfu {
+    color: var(--hi-function);
+}
+
+.üop {
+    color: var(--hi-operator);
+}
+
+.üde {
+    color: var(--hi-delimiter);
+}
+
+.üco {
+    color: var(--hi-comment);
+}
+
+.üco * {
+    color: var(--hi-comment) !important;
 }
 
 .button-container {
