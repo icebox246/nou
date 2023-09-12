@@ -233,7 +233,13 @@ OperatorKind operator_of_token(Token tok) {
     }
 }
 
-bool parse_expression(Parser* p, Expression* ex, Token terminator) {
+typedef enum {
+    EPTM_DEFAULT = 0,
+    EPTM_ON_MISMATCHED_PAREN,
+} ExpressionParsingTerminationMode;
+
+bool parse_expression(Parser* p, Expression* ex,
+                      ExpressionParsingTerminationMode termination_mode) {
     struct {
         da_list(OperatorKind);
     } op_stack = {0};
@@ -243,20 +249,9 @@ bool parse_expression(Parser* p, Expression* ex, Token terminator) {
 
     while (true) {
         Token token = lexer_next_token(p->lex);
-        if (token == terminator) {
+        if (token == T_SEMICOLON && termination_mode == EPTM_DEFAULT) {
             lexer_undo_token(p->lex);
-            while (op_stack.count) {
-                assert(op_stack.items[op_stack.count - 1] != OP_OPEN_PAREN);
-                Expr e = {
-                    .kind = EK_OPERATOR,
-                    .props.op = op_stack.items[op_stack.count - 1],
-                };
-                da_append(*ex, e);
-                op_stack.count--;
-            }
-            free(op_stack.items);
-            free(func_name_stack.items);
-            return true;
+            break;
         }
         {
             OperatorKind new_op = operator_of_token(token);
@@ -287,8 +282,13 @@ bool parse_expression(Parser* p, Expression* ex, Token terminator) {
             } break;
             case T_CLOSE_PARENS: {
                 if (op_stack.count == 0) {
-                    fprintf(stderr, "Mismatched parenthesis!\n");
-                    return false;
+                    if (termination_mode == EPTM_ON_MISMATCHED_PAREN) {
+                        lexer_undo_token(p->lex);
+                        break;
+                    } else {
+                        fprintf(stderr, "Mismatched parenthesis!\n");
+                        return false;
+                    }
                 }
                 while (op_stack.items[op_stack.count - 1] != OP_OPEN_PAREN) {
                     if (op_stack.count == 0) {
@@ -368,7 +368,19 @@ bool parse_expression(Parser* p, Expression* ex, Token terminator) {
         }
     }
 
-    assert(false && "Unreachable");
+    while (op_stack.count) {
+        assert(op_stack.items[op_stack.count - 1] != OP_OPEN_PAREN);
+        Expr e = {
+            .kind = EK_OPERATOR,
+            .props.op = op_stack.items[op_stack.count - 1],
+        };
+        da_append(*ex, e);
+        op_stack.count--;
+    }
+    free(op_stack.items);
+    free(func_name_stack.items);
+
+    return true;
 }
 
 bool parse_decl_statement(Parser* p, ExpressionStatement* st, char* decl_name) {
@@ -424,7 +436,7 @@ bool parse_decl_statement(Parser* p, ExpressionStatement* st, char* decl_name) {
                     };
                     da_append(st->expr, e);
                 }
-                if (!parse_expression(p, &st->expr, T_SEMICOLON)) {
+                if (!parse_expression(p, &st->expr, EPTM_DEFAULT)) {
                     fprintf(stderr,
                             "Failed to parse initialization expression!\n");
                     return false;
@@ -565,7 +577,7 @@ bool parse_block_statement(Parser* p, BlockStatement* st) {
 
 bool parse_return_statement(Parser* p, ReturnStatement* st) {
     st->kind = SK_RETURN;
-    if (!parse_expression(p, &st->expr, T_SEMICOLON)) {
+    if (!parse_expression(p, &st->expr, EPTM_DEFAULT)) {
         fprintf(stderr, "Failed to expression in return statement!\n");
         return false;
     }
@@ -582,7 +594,7 @@ bool parse_return_statement(Parser* p, ReturnStatement* st) {
 
 bool parse_expr_statement(Parser* p, ExpressionStatement* st) {
     st->kind = SK_EXPRESSION;
-    if (!parse_expression(p, &st->expr, T_SEMICOLON)) {
+    if (!parse_expression(p, &st->expr, EPTM_DEFAULT)) {
         fprintf(stderr,
                 "Failed to parse expression in expression statement!\n");
         return false;
