@@ -1,10 +1,6 @@
 import './highlight.css'
 
 export function highlightCode(text) {
-    text = text.replace(/&/g, "&amp");
-    text = text.replace(/</g, "&lt");
-    text = text.replace(/>/g, "&gt");
-
     function hi(group) {
         return `↓${group}→$1←`;
     }
@@ -34,9 +30,9 @@ export function highlightCode(text) {
     text = text.replace(/(?<=→export←\s*)([A-Za-z_][A-Za-z0-9_]*)/g, hi("fu"));
 
     // operators
-    text = text.replace(/(?<!:)(=)(?!"ü)/g, hi("op"));
+    text = text.replace(/(?<!:)(=)/g, hi("op"));
     text = text.replace(/(\+)/g, hi("op"));
-    text = text.replace(/(-)(?!\&gt)/g, hi("op"));
+    text = text.replace(/(-)(?!\>)/g, hi("op"));
     text = text.replace(/(\*)/g, hi("op"));
     text = text.replace(/(?<!\<|\/)(\/)(?!\/)/g, hi("op"));
     text = text.replace(/(%)/g, hi("op"));
@@ -51,11 +47,17 @@ export function highlightCode(text) {
     text = text.replace(/(\))/g, hi("de"));
     text = text.replace(/(,)/g, hi("de"));
     text = text.replace(/(;)/g, hi("de"));
-    text = text.replace(/(-\&gt)/g, hi("de"));
+    text = text.replace(/(->)/g, hi("de"));
     text = text.replace(/(:=)/g, hi("de"));
 
     // comments
     text = text.replace(/(\/\/.*\n)/g, hi("co"));
+
+
+    // cleanup
+    text = text.replace(/&/g, "&amp");
+    text = text.replace(/</g, "&lt");
+    text = text.replace(/>/g, "&gt");
 
     text = text.replace(/↓(\w\w)→/g, '<span class="hi-$1">')
     text = text.replace(/←/g, '</span>')
