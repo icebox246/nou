@@ -97,42 +97,6 @@ main {
     color: var(--hi-normal);
 }
 
-.ünu {
-    color: var(--hi-number);
-}
-
-.ükw {
-    color: var(--hi-keyword);
-}
-
-.üty {
-    color: var(--hi-type);
-}
-
-.übo {
-    color: var(--hi-boolean);
-}
-
-.üfu {
-    color: var(--hi-function);
-}
-
-.üop {
-    color: var(--hi-operator);
-}
-
-.üde {
-    color: var(--hi-delimiter);
-}
-
-.üco {
-    color: var(--hi-comment);
-}
-
-.üco * {
-    color: var(--hi-comment) !important;
-}
-
 .button-container {
     display: flex;
     justify-content: space-between;

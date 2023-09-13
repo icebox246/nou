@@ -1,4 +1,5 @@
 import defaultText from './example.u?raw'
+import { highlightCode } from './highlight';
 
 /**
  * @type {(element: HTMLTextAreaElement)}
@@ -39,71 +40,18 @@ export function setupCodeEditor(element) {
     const highlighted = document.createElement("p");
     highlighted.classList.add("code-editor-highlighted");
 
-    function updateHighglighedText() {
-        let text = textarea.value;
+    function updateHighlighedText() {
+        const text = textarea.value;
 
-        text = text.replace(/</g, "&lt");
-        text = text.replace(/>/g, "&gt");
+        const highlighted_text = highlightCode(text);
 
-        function hi(group) {
-            return `<span class="ü${group}">$1</span>`;
-        }
-
-        // numbers
-        text = text.replace(/(?<!\w)([0-9]+)/g, hi("nu"));
-
-        // keywords
-        text = text.replace(/(?<!\w)(export)(?!\w)/g, hi("kw"));
-        text = text.replace(/(?<!\w)(extern)(?!\w)/g, hi("kw"));
-        text = text.replace(/(?<!\w)(fn)(?!\w)/g, hi("kw"));
-        text = text.replace(/(?<!\w)(return)(?!\w)/g, hi("kw"));
-        text = text.replace(/(?<!\w)(if)(?!\w)/g, hi("kw"));
-        text = text.replace(/(?<!\w)(else)(?!\w)/g, hi("kw"));
-
-        // types
-        text = text.replace(/(?<!\w)(i32)(?!\w)/g, hi("ty"));
-        text = text.replace(/(?<!\w)(bool)(?!\w)/g, hi("ty"));
-
-        // boolean
-        text = text.replace(/(?<!\w)(true)(?!\w)/g, hi("bo"));
-        text = text.replace(/(?<!\w)(false)(?!\w)/g, hi("bo"));
-
-        // functions
-        text = text.replace(/(?<!\w)([A-Za-z_][A-Za-z0-9_]*)(?=\s*\()/g, hi("fu"));
-        text = text.replace(/(?<!\w)([A-Za-z_][A-Za-z0-9_]*)(?=\s*:=\s*<span class="ükw">fn<\/span>)/g, hi("fu"));
-        text = text.replace(/(?<=<span class="ükw">export<\/span>\s*)([A-Za-z_][A-Za-z0-9_]*)/g, hi("fu"));
-
-        // operators
-        text = text.replace(/(?<!:)(=)(?!"ü)/g, hi("op"));
-        text = text.replace(/(\+)/g, hi("op"));
-        text = text.replace(/(-)(?!\&gt)/g, hi("op"));
-        text = text.replace(/(\*)/g, hi("op"));
-        text = text.replace(/(?<!\<|\/)(\/)(?!\/)/g, hi("op"));
-        text = text.replace(/(%)/g, hi("op"));
-        text = text.replace(/(?<!\w)(and)(?!\w)/g, hi("op"));
-        text = text.replace(/(?<!\w)(or)(?!\w)/g, hi("op"));
-
-        // delimiters
-        text = text.replace(/(:)(?!=)/g, hi("de"));
-        text = text.replace(/({)/g, hi("de"));
-        text = text.replace(/(})/g, hi("de"));
-        text = text.replace(/(\()/g, hi("de"));
-        text = text.replace(/(\))/g, hi("de"));
-        text = text.replace(/(,)/g, hi("de"));
-        text = text.replace(/(;)/g, hi("de"));
-        text = text.replace(/(-\&gt)/g, hi("de"));
-        text = text.replace(/(:=)/g, hi("de"));
-
-        // comments
-        text = text.replace(/(\/\/.*\n)/g, hi("co"));
-
-        highlighted.innerHTML = text;
+        highlighted.innerHTML = highlighted_text;
         textarea.style.height = `${textarea.scrollHeight}px`;
         textarea.style.width = `${textarea.scrollWidth}px`;
     }
 
-    textarea.addEventListener("input", updateHighglighedText);
-    updateHighglighedText();
+    textarea.addEventListener("input", updateHighlighedText);
+    updateHighlighedText();
 
     element.appendChild(highlighted);
 

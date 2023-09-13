@@ -1,0 +1,35 @@
+.hi-nu {
+    color: var(--hi-number);
+}
+
+.hi-kw {
+    color: var(--hi-keyword);
+}
+
+.hi-ty {
+    color: var(--hi-type);
+}
+
+.hi-bo {
+    color: var(--hi-boolean);
+}
+
+.hi-fu {
+    color: var(--hi-function);
+}
+
+.hi-op {
+    color: var(--hi-operator);
+}
+
+.hi-de {
+    color: var(--hi-delimiter);
+}
+
+.hi-co {
+    color: var(--hi-comment);
+}
+
+.hi-co * {
+    color: var(--hi-comment) !important;
+}
