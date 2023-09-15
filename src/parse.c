@@ -15,6 +15,14 @@ bool parse_value_type(Parser* p, ValueType* vt) {
             *vt = (ValueType){
                 .kind = VT_INT,
                 .props.i.bits = 32,
+                .props.i.unsign = false,
+            };
+            break;
+        case KW_u8:
+            *vt = (ValueType){
+                .kind = VT_INT,
+                .props.i.bits = 8,
+                .props.i.unsign = true,
             };
             break;
         case KW_bool:
@@ -367,10 +375,12 @@ bool parse_expression(Parser* p, Expression* ex,
                     da_append(*ex, e);
                 }
             } break;
-            case T_INT: {  // TODO should all int consts be treated as i32?
+            case T_INT: {
                 Expr e = {
-                    .kind = EK_I32_CONST,
-                    .props.i32 = p->lex->token_int,
+                    .kind = EK_INT_CONST,
+                    .props.i.value = p->lex->token_int,
+                    .props.i.bits = p->lex->token_bits,
+                    .props.i.unsign = p->lex->token_unsign,
                 };
                 da_append(*ex, e);
             } break;

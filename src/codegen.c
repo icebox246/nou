@@ -112,7 +112,7 @@ ByteBuffer codegen_value_type(Module* mod, ValueType vt) {
             exit(1);
             break;
         case VT_INT: {
-            assert(vt.props.i.bits == 32);
+            assert(vt.props.i.bits <= 32);
             ByteBuffer bb = {0};
             da_append(bb, 0x7F);
             return bb;
@@ -132,8 +132,7 @@ size_t get_size_of_value_type(Module* mod, ValueType vt) {
         case VT_NIL:
             return 0;
         case VT_INT:
-            assert(vt.props.i.bits == 32);
-            return 4;
+            return (vt.props.i.bits + 7) / 8;
         case VT_BOOL:
             return 1;
             break;
@@ -239,13 +238,32 @@ bool find_temp_i32_index(Module* mod, size_t scope, size_t* out_index) {
     return false;
 }
 
+void bb_append_applying_bitmask_i32(ByteBuffer* bb, int bits) {
+    if (bits < 32) {
+        da_append(*bb, 0x41);  // opcode for i32.const
+        bb_append_leb128_u(bb, (1 << bits) - 1);
+        da_append(*bb, 0x71);  // opcode for i32.and
+    }
+}
+
 ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
                         size_t scope) {
     ByteBuffer e = {0};
     switch (ex->kind) {
-        case EK_I32_CONST:
-            da_append(e, 0x41);                     // opcode for i32.const
-            bb_append_leb128_u(&e, ex->props.i32);  // TODO make it signed
+        case EK_INT_CONST:
+            switch (ex->props.i.bits) {
+                case 8:
+                case 32:
+                    da_append(e, 0x41);  // opcode for i32.const
+                    bb_append_leb128_u(
+                        &e,
+                        ex->props.i.value);  // TODO make it signed
+                    break;
+                default:
+                    fprintf(stderr, "%d-bit integers are not supported!\n",
+                            ex->props.i.bits);
+                    assert(false && "Unsupported int size");
+            }
             break;
         case EK_BOOL_CONST:
             da_append(e, 0x41);  // opcode for i32.const
@@ -295,10 +313,32 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
 
                         switch (var_decl->value.vt.kind) {
                             case VT_INT:
-                                assert(var_decl->value.vt.props.i.bits == 32);
-                                da_append(e, 0x28);  // opcode for i32.load
-                                bb_append_leb128_u(&e, 0);          // align
-                                bb_append_leb128_u(&e, var_index);  // offset
+                                switch (var_decl->value.vt.props.i.bits) {
+                                    case 8:
+                                        da_append(
+                                            e,
+                                            0x2D);  // opcode for i32.load8_u
+                                        bb_append_leb128_u(&e, 0);  // align
+                                        bb_append_leb128_u(
+                                            &e,
+                                            var_index);  // offset
+                                        break;
+                                    case 32:
+                                        da_append(e,
+                                                  0x28);  // opcode for i32.load
+                                        bb_append_leb128_u(&e, 0);  // align
+                                        bb_append_leb128_u(
+                                            &e,
+                                            var_index);  // offset
+                                        break;
+                                    default:
+                                        fprintf(
+                                            stderr,
+                                            "%d-bit integers are not "
+                                            "supported!\n",
+                                            var_decl->value.vt.props.i.bits);
+                                        assert(false && "Unsupported int size");
+                                }
                                 break;
                             case VT_BOOL:
                                 da_append(e, 0x2D);  // opcode for i32.load8_u
@@ -316,32 +356,56 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
             switch (ex->props.op) {
                 case OP_ADDITION:
                     assert(decision.left_type.kind == VT_INT &&
-                           decision.right_type.kind == VT_INT);
+                           compare_value_types(decision.left_type,
+                                               decision.right_type));
                     da_append(e, 0x6A);  // opcode for i32.add
+                    bb_append_applying_bitmask_i32(
+                        &e, decision.left_type.props.i.bits);
                     break;
                 case OP_SUBTRACTION:
                     assert(decision.left_type.kind == VT_INT &&
-                           decision.right_type.kind == VT_INT);
+                           compare_value_types(decision.left_type,
+                                               decision.right_type));
                     da_append(e, 0x6B);  // opcode for i32.sub
+                    bb_append_applying_bitmask_i32(
+                        &e, decision.left_type.props.i.bits);
                     break;
                 case OP_MULTIPLICATION:
                     assert(decision.left_type.kind == VT_INT &&
-                           decision.right_type.kind == VT_INT);
+                           compare_value_types(decision.left_type,
+                                               decision.right_type));
                     da_append(e, 0x6C);  // opcode for i32.mul
+                    bb_append_applying_bitmask_i32(
+                        &e, decision.left_type.props.i.bits);
                     break;
                 case OP_REMAINDER:
                     assert(decision.left_type.kind == VT_INT &&
-                           decision.right_type.kind == VT_INT);
-                    da_append(e, 0x6F);  // opcode for i32.rem_s
+                           compare_value_types(decision.left_type,
+                                               decision.right_type));
+                    if (!decision.left_type.props.i.unsign) {
+                        da_append(e, 0x6F);  // opcode for i32.rem_s
+                    } else {
+                        da_append(e, 0x70);  // opcode for i32.rem_u
+                    }
+                    bb_append_applying_bitmask_i32(
+                        &e, decision.left_type.props.i.bits);
                     break;
                 case OP_DIVISION:
                     assert(decision.left_type.kind == VT_INT &&
-                           decision.right_type.kind == VT_INT);
-                    da_append(e, 0x6D);  // opcode for i32.div_s
+                           compare_value_types(decision.left_type,
+                                               decision.right_type));
+                    if (!decision.left_type.props.i.unsign) {
+                        da_append(e, 0x6D);  // opcode for i32.div_s
+                    } else {
+                        da_append(e, 0x6E);  // opcode for i32.div_u
+                    }
+                    bb_append_applying_bitmask_i32(
+                        &e, decision.left_type.props.i.bits);
                     break;
                 case OP_EQUALITY:
                     assert(decision.left_type.kind == VT_INT &&
-                           decision.right_type.kind == VT_INT);
+                           compare_value_types(decision.left_type,
+                                               decision.right_type));
                     da_append(e, 0x46);  // opcode for i32.eq
                     break;
                 case OP_ALTERNATIVE:
@@ -357,15 +421,51 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
                 case OP_ASSIGNEMENT: {  // TODO figure out which instruction
                                         // should be codegenned base on type
                                         // stack
+                    if (!compare_value_types(decision.left_type,
+                                             decision.right_type)) {
+                        assert(false && "Non matching types in assignement");
+                    }
+
+                    assert(decision.left_type.kind != VT_INT ||
+                           decision.left_type.props.i.bits <= 32);
+
                     size_t temp_i32_index;
                     assert(find_temp_i32_index(mod, scope, &temp_i32_index));
 
                     da_append(e, 0x22);  // opcode for local.tee
                     bb_append_leb128_u(&e, temp_i32_index);
 
-                    da_append(e, 0x36);  // opcode for i32.store
-                    bb_append_leb128_u(&e, 0);
-                    bb_append_leb128_u(&e, 0);
+                    switch (decision.left_type.kind) {
+                        case VT_NIL:
+                            assert(false && "Cannot assing to nil value type");
+                            break;
+                        case VT_INT: {
+                            switch (decision.left_type.props.i.bits) {
+                                case 8:
+                                    da_append(e,
+                                              0x3A);  // opcode for i32.store8
+                                    bb_append_leb128_u(&e, 0);
+                                    bb_append_leb128_u(&e, 0);
+                                    break;
+                                case 32:
+                                    da_append(e, 0x36);  // opcode for i32.store
+                                    bb_append_leb128_u(&e, 0);
+                                    bb_append_leb128_u(&e, 0);
+                                    break;
+                                default:
+                                    fprintf(
+                                        stderr,
+                                        "%d-bit integers are not supported!\n",
+                                        decision.left_type.props.i.bits);
+                                    assert(false && "Unsupported int size");
+                            }
+                        } break;
+                        case VT_BOOL:
+                            da_append(e, 0x3A);  // opcode for i32.store8
+                            bb_append_leb128_u(&e, 0);
+                            bb_append_leb128_u(&e, 0);
+                            break;
+                    }
 
                     da_append(e, 0x20);  // opcode for local.get
                     bb_append_leb128_u(&e, temp_i32_index);
@@ -421,11 +521,12 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
         Expr* e = &expr->items[i];
 
         switch (e->kind) {
-            case EK_I32_CONST: {
+            case EK_INT_CONST: {
                 da_append(index_stack, temp_index);
                 ValueType vt = {
                     .kind = VT_INT,
-                    .props.i.bits = 32,
+                    .props.i.bits = e->props.i.bits,
+                    .props.i.unsign = e->props.i.unsign,
                 };
                 da_append(type_stack, vt);
             } break;

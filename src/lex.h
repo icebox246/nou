@@ -37,6 +37,7 @@ typedef enum {
     KW_AND,
     KW_OR,
 
+    KW_u8,
     KW_i32,
     KW_bool,
 } Token;
@@ -54,6 +55,8 @@ typedef struct {
     char* token_text;
     size_t token_len;
     int64_t token_int;
+    int token_bits;
+    bool token_unsign;
     bool token_bool;
     Location token_start_loc;
     Location token_end_loc;

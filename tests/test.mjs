@@ -25,6 +25,7 @@ const {
     boolean_values2,
     if_statement,
     if_else_statement,
+    u8_values,
 } = module.instance.exports;
 
 function runTests(tests) {
@@ -107,5 +108,9 @@ runTests({
     if_else_statement_negative: {
         expr: () => if_else_statement(21),
         expected: 1,
+    },
+    u8_values: {
+        expr: () => u8_values(),
+        expected: 42,
     },
 });

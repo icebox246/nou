@@ -106,6 +106,10 @@ Token lexer_next_token(Lexer* lexer) {
             strncmp("return", lexer->token_text, lexer->token_len) == 0) {
             return lexer->token = KW_RETURN;
         }
+        if (lexer->token_len == 2 &&
+            strncmp("u8", lexer->token_text, lexer->token_len) == 0) {
+            return lexer->token = KW_u8;
+        }
         if (lexer->token_len == 3 &&
             strncmp("i32", lexer->token_text, lexer->token_len) == 0) {
             return lexer->token = KW_i32;
@@ -140,18 +144,34 @@ Token lexer_next_token(Lexer* lexer) {
         }
 
         int64_t res = 0;
+        bool parsing_bits = false;
+
+        int res_bits = 32;  // default type is i32
+        bool res_unsing = false;
+
         for (size_t i = 0; i < lexer->token_len; i++) {
             char c = lexer->token_text[i];
             if (!isdigit(c)) {
-                fprintf(stderr, "%d:%d: Unsupported character in number: '%c'",
-                        (int)lexer->token_start_loc.line,
-                        (int)(lexer->token_start_loc.col + i), c);
+                if (!parsing_bits && (c == 'u' || c == 'i')) {
+                    res_bits = 0;
+                    res_unsing = c == 'u';
+                    parsing_bits = true;
+                    continue;
+                }
+                loc_print(stderr, lexer->token_start_loc);
+                fprintf(stderr, "Unsupported character in number: '%c'\n", c);
                 exit(-1);
             }
-            res = res * 10 + (c - '0');
+            if (!parsing_bits) {
+                res = res * 10 + (c - '0');
+            } else {
+                res_bits = res_bits * 10 + (c - '0');
+            }
         }
 
         lexer->token_int = res;
+        lexer->token_bits = res_bits;
+        lexer->token_unsign = res_unsing;
 
         return lexer->token = T_INT;
     } else {

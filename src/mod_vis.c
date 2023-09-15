@@ -35,9 +35,9 @@ void visualize_value_type(ValueType vt, Visualizer* v) {
 
 void visualize_expr(Expr* e, Visualizer* v) {
     switch (e->kind) {
-        case EK_I32_CONST:
+        case EK_INT_CONST:
             vis_write_indent(v);
-            fprintf(v->file, "i32_const %d\n", e->props.i32);
+            fprintf(v->file, "int_const %zi\n", e->props.i.value);
             break;
         case EK_BOOL_CONST:
             vis_write_indent(v);
@@ -155,6 +155,14 @@ void visualize_if_statement(IfStatement* s, Visualizer* v) {
     v->indent++;
     visualize_statement(s->positive_branch, v);
     v->indent--;
+
+    if (s->negative_branch) {
+        vis_write_indent(v);
+        fprintf(v->file, "else\n");
+        v->indent++;
+        visualize_statement(s->negative_branch, v);
+        v->indent--;
+    }
 }
 
 void visualize_expr_statement(ReturnStatement* s, Visualizer* v) {

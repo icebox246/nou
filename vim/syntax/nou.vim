@@ -4,13 +4,13 @@
 " syntax region NOUChar start=/\v'/ skip=/\v\\./ end=/\v'/
 " highligh link NOUChar Character
 
-syn match NOUNumber /\<[0-9]\+\>/
+syn match NOUNumber /\<[0-9]\+\([ui][0-9]\+\)\?\>/
 highligh link NOUNumber Number
 
 syn keyword NOUKeyword export extern fn return if else
 highligh link NOUKeyword Keyword
 
-syn keyword NOUType i32 bool
+syn keyword NOUType u8 i32 bool
 highligh link NOUType Type
 
 syn keyword NOUBoolean true false 

@@ -14,6 +14,7 @@ export boolean_values;
 export boolean_values2;
 export if_statement;
 export if_else_statement;
+export u8_values;
 
 // adds two numbers 
 add := fn a: i32, b: i32 -> i32 {
@@ -111,4 +112,11 @@ if_else_statement := fn n: i32 -> bool {
         foo = 1;
 
     return foo * n % 2 == 0;
+};
+
+// tests for u8 type
+u8_values := fn -> u8 {
+    a := u8 43u8;
+    o := u8 255u8;
+    return a + o;
 };

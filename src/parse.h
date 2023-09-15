@@ -36,6 +36,7 @@ typedef struct {
     union {
         struct {
             int bits;
+            bool unsign;
         } i;
     } props;
 } ValueType;
@@ -62,7 +63,7 @@ typedef struct {
 // expressions
 
 typedef enum {
-    EK_I32_CONST,
+    EK_INT_CONST,
     EK_BOOL_CONST,
     EK_VAR,
     EK_OPERATOR,
@@ -87,7 +88,11 @@ typedef enum {
 typedef struct {
     ExprKind kind;
     union {
-        int32_t i32;
+        struct {
+            int64_t value;
+            int bits;
+            bool unsign;
+        } i;
         bool boolean;
         char* var;
         OperatorKind op;
