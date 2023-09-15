@@ -12,10 +12,15 @@ bool parse_value_type(Parser* p, ValueType* vt) {
     Token token = lexer_next_token(p->lex);
     switch (token) {
         case KW_i32:
-            *vt = VT_I32;
+            *vt = (ValueType){
+                .kind = VT_INT,
+                .props.i.bits = 32,
+            };
             break;
         case KW_bool:
-            *vt = VT_BOOL;
+            *vt = (ValueType){
+                .kind = VT_BOOL,
+            };
             break;
         default:
             loc_print(stderr, p->lex->token_start_loc);
@@ -42,8 +47,16 @@ bool check_decl_name_available(Parser* p, char* decl_name) {
 }
 
 bool compare_value_types(ValueType a, ValueType b) {
-    return a ==
-           b;  // TODO when ValueType gets more complicated improve this check
+    if (a.kind != b.kind) return false;
+    switch (a.kind) {
+        case VT_INT:
+            if (a.props.i.bits != b.props.i.bits) return false;
+            break;
+        case VT_NIL:
+        case VT_BOOL:
+            break;
+    }
+    return true;
 }
 
 bool find_function_type_idx(Parser* p, FunctionType ft, size_t* out_index) {
@@ -58,7 +71,8 @@ bool find_function_type_idx(Parser* p, FunctionType ft, size_t* out_index) {
 
         bool matching_args = true;
         for (size_t j = 0; j < ps->count; j++) {
-            if (!compare_value_types(ps->items[j].value, ps2->items[j].value)) {
+            if (!compare_value_types(ps->items[j].value.vt,
+                                     ps2->items[j].value.vt)) {
                 matching_args = false;
                 break;
             }
@@ -439,7 +453,7 @@ bool parse_decl_statement(Parser* p, ExpressionStatement* st, char* decl_name) {
             }
             p->current_scope = old_scope;
 
-            d->value = p->mod->functions.count;
+            d->value.func_index = p->mod->functions.count;
             da_append(p->mod->functions, f);
         } break;
         default: {  // try to parse variable type
@@ -580,7 +594,7 @@ bool parse_extern_statement(Parser* p) {
         return false;
     }
 
-    d->value = p->mod->extern_functions.count;
+    d->value.func_index = p->mod->extern_functions.count;
     da_append(p->mod->extern_functions, f);
     return true;
 }

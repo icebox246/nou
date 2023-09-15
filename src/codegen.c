@@ -106,12 +106,13 @@ static void vec_append_elem(Vec* v, ByteBuffer* elem) {
 // value types
 
 ByteBuffer codegen_value_type(Module* mod, ValueType vt) {
-    switch (vt) {
+    switch (vt.kind) {
         case VT_NIL:
             fprintf(stderr, "Nil value type should not be codegenned\n");
             exit(1);
             break;
-        case VT_I32: {
+        case VT_INT: {
+            assert(vt.props.i.bits == 32);
             ByteBuffer bb = {0};
             da_append(bb, 0x7F);
             return bb;
@@ -127,10 +128,11 @@ ByteBuffer codegen_value_type(Module* mod, ValueType vt) {
 }
 
 size_t get_size_of_value_type(Module* mod, ValueType vt) {
-    switch (vt) {
+    switch (vt.kind) {
         case VT_NIL:
             return 0;
-        case VT_I32:
+        case VT_INT:
+            assert(vt.props.i.bits == 32);
             return 4;
         case VT_BOOL:
             return 1;
@@ -160,7 +162,7 @@ bool find_local_var(Module* mod, size_t scope, char* name, size_t* out_index,
         }
         if (decl->kind == DK_PARAM) param_index++;
         if (out_index && decl->kind == DK_VARIABLE)
-            *out_index += get_size_of_value_type(mod, decl->value);
+            *out_index += get_size_of_value_type(mod, decl->value.vt);
     }
 
     return false;
@@ -178,11 +180,12 @@ bool find_local_fn(Module* mod, size_t scope, char* name, size_t* out_index) {
         if (strcmp(decl->name, name) == 0) {
             if (decl->kind == DK_FUNCTION) {
                 if (out_index)
-                    *out_index = decl->value + mod->extern_functions.count;
+                    *out_index =
+                        decl->value.func_index + mod->extern_functions.count;
                 return true;
             }
             if (decl->kind == DK_EXTERN_FUNCTION) {
-                if (out_index) *out_index = decl->value;
+                if (out_index) *out_index = decl->value.func_index;
                 return true;
             }
             return false;
@@ -207,7 +210,8 @@ bool calc_local_frame_size(Module* mod, size_t scope, size_t* out_size) {
     for (size_t i = 0; i < s->count; i++) {
         Decl* decl = &s->items[i];
         if (decl->kind == DK_VARIABLE) {
-            if (out_size) *out_size += get_size_of_value_type(mod, decl->value);
+            if (out_size)
+                *out_size += get_size_of_value_type(mod, decl->value.vt);
         }
     }
 
@@ -289,8 +293,9 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
                         da_append(e, 0x20);  // opcode for local.get
                         bb_append_leb128_u(&e, stack_base_index);
 
-                        switch ((ValueType)var_decl->value) {
-                            case VT_I32:
+                        switch (var_decl->value.vt.kind) {
+                            case VT_INT:
+                                assert(var_decl->value.vt.props.i.bits == 32);
                                 da_append(e, 0x28);  // opcode for i32.load
                                 bb_append_leb128_u(&e, 0);          // align
                                 bb_append_leb128_u(&e, var_index);  // offset
@@ -310,43 +315,43 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
         case EK_OPERATOR: {
             switch (ex->props.op) {
                 case OP_ADDITION:
-                    assert(decision.left_type == VT_I32 &&
-                           decision.right_type == VT_I32);
+                    assert(decision.left_type.kind == VT_INT &&
+                           decision.right_type.kind == VT_INT);
                     da_append(e, 0x6A);  // opcode for i32.add
                     break;
                 case OP_SUBTRACTION:
-                    assert(decision.left_type == VT_I32 &&
-                           decision.right_type == VT_I32);
+                    assert(decision.left_type.kind == VT_INT &&
+                           decision.right_type.kind == VT_INT);
                     da_append(e, 0x6B);  // opcode for i32.sub
                     break;
                 case OP_MULTIPLICATION:
-                    assert(decision.left_type == VT_I32 &&
-                           decision.right_type == VT_I32);
+                    assert(decision.left_type.kind == VT_INT &&
+                           decision.right_type.kind == VT_INT);
                     da_append(e, 0x6C);  // opcode for i32.mul
                     break;
                 case OP_REMAINDER:
-                    assert(decision.left_type == VT_I32 &&
-                           decision.right_type == VT_I32);
+                    assert(decision.left_type.kind == VT_INT &&
+                           decision.right_type.kind == VT_INT);
                     da_append(e, 0x6F);  // opcode for i32.rem_s
                     break;
                 case OP_DIVISION:
-                    assert(decision.left_type == VT_I32 &&
-                           decision.right_type == VT_I32);
+                    assert(decision.left_type.kind == VT_INT &&
+                           decision.right_type.kind == VT_INT);
                     da_append(e, 0x6D);  // opcode for i32.div_s
                     break;
                 case OP_EQUALITY:
-                    assert(decision.left_type == VT_I32 &&
-                           decision.right_type == VT_I32);
+                    assert(decision.left_type.kind == VT_INT &&
+                           decision.right_type.kind == VT_INT);
                     da_append(e, 0x46);  // opcode for i32.eq
                     break;
                 case OP_ALTERNATIVE:
-                    assert(decision.left_type == VT_BOOL &&
-                           decision.right_type == VT_BOOL);
+                    assert(decision.left_type.kind == VT_BOOL &&
+                           decision.right_type.kind == VT_BOOL);
                     da_append(e, 0x72);  // opcode for i32.or
                     break;
                 case OP_CONJUNCTION:
-                    assert(decision.left_type == VT_BOOL &&
-                           decision.right_type == VT_BOOL);
+                    assert(decision.left_type.kind == VT_BOOL &&
+                           decision.right_type.kind == VT_BOOL);
                     da_append(e, 0x71);  // opcode for i32.and
                     break;
                 case OP_ASSIGNEMENT: {  // TODO figure out which instruction
@@ -418,18 +423,22 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
         switch (e->kind) {
             case EK_I32_CONST: {
                 da_append(index_stack, temp_index);
-                da_append(type_stack, VT_I32);
+                ValueType vt = {
+                    .kind = VT_INT,
+                    .props.i.bits = 32,
+                };
+                da_append(type_stack, vt);
             } break;
             case EK_BOOL_CONST: {
                 da_append(index_stack, temp_index);
-                da_append(type_stack, VT_BOOL);
+                da_append(type_stack, (ValueType){.kind = VT_BOOL});
             } break;
             case EK_VAR: {
                 Decl* decl;
                 assert(find_local_var(mod, scope, e->props.var, NULL, &decl) &&
                        "Use of undeclared variable");
                 da_append(index_stack, i);
-                da_append(type_stack, decl->value);
+                da_append(type_stack, decl->value.vt);
             } break;
             case EK_OPERATOR: {
                 assert(index_stack.count >= 2 &&
@@ -459,7 +468,7 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
                         index_stack.count -= 2;
                         type_stack.count -= 2;
                         da_append(index_stack, temp_index);
-                        da_append(type_stack, VT_BOOL);
+                        da_append(type_stack, (ValueType){.kind = VT_BOOL});
                     } break;
                     case OP_ASSIGNEMENT: {
                         index_stack.count -= 2;
@@ -496,15 +505,16 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
                 assert(type_stack.count >= arity);
 
                 for (int i = 0; i < arity; i++) {
-                    if (type_stack.items[type_stack.count - arity + i] !=
-                        param_scope->items[i].value)
+                    if (!compare_value_types(
+                            type_stack.items[type_stack.count - arity + i],
+                            param_scope->items[i].value.vt))
                         assert(false && "Type mismatch in function arguments");
                 }
 
                 index_stack.count -= arity;
                 type_stack.count -= arity;
 
-                if (f->return_type != VT_NIL) {
+                if (f->return_type.kind != VT_NIL) {
                     da_append(index_stack, temp_index);
                     da_append(type_stack, f->return_type);
                 }
@@ -519,7 +529,7 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
                 *out_remaining_value = *type_stack.items;
                 break;
             case 0:
-                *out_remaining_value = VT_NIL;
+                out_remaining_value->kind = VT_NIL;
                 break;
             default:
                 assert(false &&
@@ -574,7 +584,8 @@ ByteBuffer codegen_return_statement(Module* mod, ReturnStatement* st,
 ByteBuffer codegen_if_statement(Module* mod, IfStatement* st, size_t scope) {
     ValueType cond_vt;
     ByteBuffer ifs = codegen_expression(mod, &st->cond_expr, scope, &cond_vt);
-    assert(cond_vt == VT_BOOL && "Condition of if statement must be a boolean");
+    assert(cond_vt.kind == VT_BOOL &&
+           "Condition of if statement must be a boolean");
     da_append(ifs, 0x04);  // opcode for if
     da_append(ifs, 0x40);  // opcode for nil result type
     {
@@ -598,7 +609,7 @@ ByteBuffer codegen_expr_statement(Module* mod, ExpressionStatement* st,
                                   size_t scope) {
     ValueType drop_value;
     ByteBuffer ex = codegen_expression(mod, &st->expr, scope, &drop_value);
-    if (drop_value != VT_NIL) {
+    if (drop_value.kind != VT_NIL) {
         da_append(ex, 0x1A);  // opcode for drop
     }
     return ex;
@@ -690,7 +701,7 @@ Section codegen_types(Module* mod) {
             for (size_t j = 0; j < param_scope->count; j++) {
                 assert(param_scope->items[j].kind == DK_PARAM);
                 ByteBuffer param_type =
-                    codegen_value_type(mod, param_scope->items[j].value);
+                    codegen_value_type(mod, param_scope->items[j].value.vt);
 
                 vec_append_elem(&param_types, &param_type);
                 free(param_type.items);
@@ -703,7 +714,7 @@ Section codegen_types(Module* mod) {
         {  // return type
             Vec result_types = {0};
 
-            if (f->return_type !=
+            if (f->return_type.kind !=
                 VT_NIL) {  // TODO support multiple return values?
                 ByteBuffer result_type =
                     codegen_value_type(mod, f->return_type);
@@ -756,7 +767,7 @@ Section codegen_import(Module* mod) {
         char* name = NULL;
         for (size_t j = 0; j < mod->scopes.items[0].count; j++) {
             Decl* d = &mod->scopes.items[0].items[j];
-            if (d->kind == DK_EXTERN_FUNCTION && d->value == i) {
+            if (d->kind == DK_EXTERN_FUNCTION && d->value.func_index == i) {
                 name = d->name;
             }
         }
@@ -833,7 +844,8 @@ Section codegen_exports(Module* mod) {
         ByteBuffer ex = {0};
         bb_append_name(&ex, decl->name);
         da_append(ex, 0x00);  // TODO support other export types
-        bb_append_leb128_u(&ex, decl->value + mod->extern_functions.count);
+        bb_append_leb128_u(
+            &ex, decl->value.func_index + mod->extern_functions.count);
 
         vec_append_elem(&exports, &ex);
 

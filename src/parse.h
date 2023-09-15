@@ -27,14 +27,26 @@ typedef enum {
 
 typedef enum {
     VT_NIL,
-    VT_I32,
+    VT_INT,
     VT_BOOL,
+} ValueTypeKind;
+
+typedef struct {
+    ValueTypeKind kind;
+    union {
+        struct {
+            int bits;
+        } i;
+    } props;
 } ValueType;
 
 typedef struct {
     char* name;
     DeclKind kind;
-    size_t value;
+    union {
+        ValueType vt;
+        size_t func_index;
+    } value;
 } Decl;
 
 typedef struct {
@@ -168,6 +180,8 @@ typedef struct {
     Module* mod;
     size_t current_scope;  // 0 is global scope
 } Parser;
+
+bool compare_value_types(ValueType a, ValueType b);
 
 Module parse(Lexer* lexer);
 

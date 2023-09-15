@@ -6,6 +6,7 @@
 typedef struct {
     FILE* file;
     size_t indent;
+    Module* mod;
 } Visualizer;
 
 void vis_write_indent(Visualizer* v) {
@@ -17,12 +18,12 @@ void vis_write_indent(Visualizer* v) {
 // value type
 
 void visualize_value_type(ValueType vt, Visualizer* v) {
-    switch ((ValueType)vt) {
+    switch (vt.kind) {
         case VT_NIL:
             fprintf(v->file, "nil");
             break;
-        case VT_I32:
-            fprintf(v->file, "i32");
+        case VT_INT:
+            fprintf(v->file, "i%d", vt.props.i.bits);
             break;
         case VT_BOOL:
             fprintf(v->file, "bool");
@@ -218,18 +219,20 @@ void visualize_decl(Decl* decl, Visualizer* v) {
     fprintf(v->file, "decl {");
     switch (decl->kind) {
         case DK_FUNCTION:
-            fprintf(v->file, "%s := fn #%zu", decl->name, decl->value);
+            fprintf(v->file, "%s := fn #%zu", decl->name,
+                    decl->value.func_index + v->mod->extern_functions.count);
             break;
         case DK_EXTERN_FUNCTION:
-            fprintf(v->file, "extern %s := fn #%zu", decl->name, decl->value);
+            fprintf(v->file, "extern %s := fn #%zu", decl->name,
+                    decl->value.func_index);
             break;
         case DK_PARAM:
             fprintf(v->file, "%s := param ", decl->name);
-            visualize_value_type(decl->value, v);
+            visualize_value_type(decl->value.vt, v);
             break;
         case DK_VARIABLE:
             fprintf(v->file, "%s := var ", decl->name);
-            visualize_value_type(decl->value, v);
+            visualize_value_type(decl->value.vt, v);
             break;
     }
     fprintf(v->file, "}\n");
@@ -371,7 +374,7 @@ void visualize_functions(Functions* extern_functions, Functions* functions,
 // module
 
 void visualize_module(Module* mod, FILE* file) {
-    Visualizer v = {.file = file};
+    Visualizer v = {.file = file, .mod = mod};
 
     vis_write_indent(&v);
     fprintf(file, "module {\n");
