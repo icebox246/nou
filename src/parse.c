@@ -18,6 +18,13 @@ bool parse_value_type(Parser* p, ValueType* vt) {
                 .props.i.unsign = false,
             };
             break;
+        case KW_u32:
+            *vt = (ValueType){
+                .kind = VT_INT,
+                .props.i.bits = 32,
+                .props.i.unsign = true,
+            };
+            break;
         case KW_u8:
             *vt = (ValueType){
                 .kind = VT_INT,

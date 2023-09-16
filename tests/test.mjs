@@ -28,6 +28,7 @@ const {
     if_statement,
     if_else_statement,
     u8_values,
+    u32_values,
     u8_slices,
 } = module.instance.exports;
 
@@ -129,6 +130,10 @@ runTests({
     },
     u8_values: {
         expr: () => u8_values(),
+        expected: 42,
+    },
+    u32_values: {
+        expr: () => u32_values(),
         expected: 42,
     },
     u8_slices: {

@@ -115,6 +115,10 @@ Token lexer_next_token(Lexer* lexer) {
             strncmp("i32", lexer->token_text, lexer->token_len) == 0) {
             return lexer->token = KW_i32;
         }
+        if (lexer->token_len == 3 &&
+            strncmp("u32", lexer->token_text, lexer->token_len) == 0) {
+            return lexer->token = KW_u32;
+        }
         if (lexer->token_len == 4 &&
             strncmp("bool", lexer->token_text, lexer->token_len) == 0) {
             return lexer->token = KW_bool;

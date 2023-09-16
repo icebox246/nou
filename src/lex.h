@@ -44,6 +44,7 @@ typedef enum {
 
     KW_u8,
     KW_i32,
+    KW_u32,
     KW_bool,
 } Token;
 
