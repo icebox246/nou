@@ -23,10 +23,16 @@ void visualize_value_type(ValueType vt, Visualizer* v) {
             fprintf(v->file, "nil");
             break;
         case VT_INT:
-            fprintf(v->file, "i%d", vt.props.i.bits);
+            fprintf(v->file, "%c%d", vt.props.i.unsign ? 'u' : 'i',
+                    vt.props.i.bits);
             break;
         case VT_BOOL:
             fprintf(v->file, "bool");
+            break;
+        case VT_SLICE:
+            fprintf(v->file, "[");
+            visualize_value_type(*vt.props.inner_type, v);
+            fprintf(v->file, "]");
             break;
     }
 }
@@ -43,6 +49,12 @@ void visualize_expr(Expr* e, Visualizer* v) {
             vis_write_indent(v);
             fprintf(v->file, "bool_const %s\n",
                     e->props.boolean ? "true" : "false");
+            break;
+        case EK_STRING_CONST:
+            vis_write_indent(v);
+            StringConstant s =
+                v->mod->string_constants.items[e->props.str_index];
+            fprintf(v->file, "string_const \"%.*s\" \n", (int)s.len, s.chars);
             break;
         case EK_VAR:
             vis_write_indent(v);

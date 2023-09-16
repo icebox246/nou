@@ -15,6 +15,7 @@ export boolean_values2;
 export if_statement;
 export if_else_statement;
 export u8_values;
+export u8_slices;
 
 // adds two numbers 
 add := fn a: i32, b: i32 -> i32 {
@@ -119,4 +120,10 @@ u8_values := fn -> u8 {
     a := u8 43u8;
     o := u8 255u8;
     return a + o;
+};
+
+// test for u8 slices
+u8_slices := fn -> [u8] {
+    str := [u8] "Hello, World!";
+    return str;
 };

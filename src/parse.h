@@ -29,15 +29,17 @@ typedef enum {
     VT_NIL,
     VT_INT,
     VT_BOOL,
+    VT_SLICE,
 } ValueTypeKind;
 
-typedef struct {
+typedef struct ValueType {
     ValueTypeKind kind;
     union {
         struct {
             int bits;
             bool unsign;
         } i;
+        struct ValueType* inner_type;
     } props;
 } ValueType;
 
@@ -65,6 +67,7 @@ typedef struct {
 typedef enum {
     EK_INT_CONST,
     EK_BOOL_CONST,
+    EK_STRING_CONST,
     EK_VAR,
     EK_OPERATOR,
     EK_FUNC_CALL,
@@ -97,6 +100,7 @@ typedef struct {
         char* var;
         OperatorKind op;
         char* func;
+        size_t str_index;
     } props;
 } Expr;
 
@@ -170,6 +174,17 @@ typedef struct {
     da_list(Function);
 } Functions;
 
+// string literals
+
+typedef struct {
+    char* chars;
+    size_t len;
+} StringConstant;
+
+typedef struct {
+    da_list(StringConstant);
+} StringConstants;
+
 // module
 
 typedef struct {
@@ -178,6 +193,7 @@ typedef struct {
     FunctionTypes function_types;
     Functions extern_functions;
     Functions functions;
+    StringConstants string_constants;
 } Module;
 
 typedef struct {

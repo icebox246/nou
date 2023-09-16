@@ -122,6 +122,11 @@ ByteBuffer codegen_value_type(Module* mod, ValueType vt) {
             da_append(bb, 0x7F);
             return bb;
         } break;
+        case VT_SLICE: {  // slice is just i64 := {count := i32, ptr := i32}
+            ByteBuffer bb = {0};
+            da_append(bb, 0x7E);
+            return bb;
+        } break;
     }
 
     assert(false && "Unreachable");
@@ -135,6 +140,9 @@ size_t get_size_of_value_type(Module* mod, ValueType vt) {
             return (vt.props.i.bits + 7) / 8;
         case VT_BOOL:
             return 1;
+            break;
+        case VT_SLICE:
+            return 8;
             break;
     }
 }
@@ -238,12 +246,30 @@ bool find_temp_i32_index(Module* mod, size_t scope, size_t* out_index) {
     return false;
 }
 
+bool find_temp_i64_index(Module* mod, size_t scope, size_t* out_index) {
+    if (find_stack_base_index(mod, scope, out_index)) {
+        if (out_index)
+            *out_index += 2;  // asserts that temp_i64 is next after temp_i32
+        return true;
+    }
+    return false;
+}
+
 void bb_append_applying_bitmask_i32(ByteBuffer* bb, int bits) {
     if (bits < 32) {
         da_append(*bb, 0x41);  // opcode for i32.const
         bb_append_leb128_u(bb, (1 << bits) - 1);
         da_append(*bb, 0x71);  // opcode for i32.and
     }
+}
+
+bool get_string_constant_offset(Module* mod, size_t index, size_t* offset) {
+    if (index > mod->string_constants.count) return false;
+    *offset = 0;
+    for (size_t i = 0; i < index; i++) {
+        offset += mod->string_constants.items[i].len;
+    }
+    return true;
 }
 
 ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
@@ -269,6 +295,16 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
             da_append(e, 0x41);  // opcode for i32.const
             bb_append_leb128_u(&e, ex->props.boolean);
             break;
+        case EK_STRING_CONST: {
+            size_t ptr;
+            assert(get_string_constant_offset(mod, ex->props.str_index, &ptr));
+            size_t len = mod->string_constants.items[ex->props.str_index].len;
+            assert(ptr < (1LL << 32) && len < (1LL << 32));
+            size_t slice = (len << 32) | ptr;
+
+            da_append(e, 0x42);  // opcode for i64.const
+            bb_append_leb128_u(&e, slice);
+        } break;
         case EK_VAR: {
             size_t var_index;
             Decl* var_decl;
@@ -345,6 +381,11 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
                                 bb_append_leb128_u(&e, 0);          // align
                                 bb_append_leb128_u(&e, var_index);  // offset
                                 break;
+                            case VT_SLICE:
+                                da_append(e, 0x29);  // opcode for i64.load
+                                bb_append_leb128_u(&e, 0);          // align
+                                bb_append_leb128_u(&e, var_index);  // offset
+                                break;
                             default:
                                 assert(false && "Unsupported variable type");
                         }
@@ -418,9 +459,7 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
                            decision.right_type.kind == VT_BOOL);
                     da_append(e, 0x71);  // opcode for i32.and
                     break;
-                case OP_ASSIGNEMENT: {  // TODO figure out which instruction
-                                        // should be codegenned base on type
-                                        // stack
+                case OP_ASSIGNEMENT: {
                     if (!compare_value_types(decision.left_type,
                                              decision.right_type)) {
                         assert(false && "Non matching types in assignement");
@@ -432,14 +471,17 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
                     size_t temp_i32_index;
                     assert(find_temp_i32_index(mod, scope, &temp_i32_index));
 
-                    da_append(e, 0x22);  // opcode for local.tee
-                    bb_append_leb128_u(&e, temp_i32_index);
+                    size_t temp_i64_index;
+                    assert(find_temp_i64_index(mod, scope, &temp_i64_index));
 
                     switch (decision.left_type.kind) {
                         case VT_NIL:
                             assert(false && "Cannot assing to nil value type");
                             break;
                         case VT_INT: {
+                            da_append(e, 0x22);  // opcode for local.tee
+                            bb_append_leb128_u(&e, temp_i32_index);
+
                             switch (decision.left_type.props.i.bits) {
                                 case 8:
                                     da_append(e,
@@ -459,16 +501,33 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
                                         decision.left_type.props.i.bits);
                                     assert(false && "Unsupported int size");
                             }
+
+                            da_append(e, 0x20);  // opcode for local.get
+                            bb_append_leb128_u(&e, temp_i32_index);
                         } break;
-                        case VT_BOOL:
+                        case VT_BOOL: {
+                            da_append(e, 0x22);  // opcode for local.tee
+                            bb_append_leb128_u(&e, temp_i32_index);
+
                             da_append(e, 0x3A);  // opcode for i32.store8
                             bb_append_leb128_u(&e, 0);
                             bb_append_leb128_u(&e, 0);
-                            break;
-                    }
 
-                    da_append(e, 0x20);  // opcode for local.get
-                    bb_append_leb128_u(&e, temp_i32_index);
+                            da_append(e, 0x20);  // opcode for local.get
+                            bb_append_leb128_u(&e, temp_i32_index);
+                        } break;
+                        case VT_SLICE: {
+                            da_append(e, 0x22);  // opcode for local.tee
+                            bb_append_leb128_u(&e, temp_i64_index);
+
+                            da_append(e, 0x37);  // opcode for i64.store
+                            bb_append_leb128_u(&e, 0);
+                            bb_append_leb128_u(&e, 0);
+
+                            da_append(e, 0x20);  // opcode for local.get
+                            bb_append_leb128_u(&e, temp_i64_index);
+                        } break;
+                    }
                 } break;
 
                 case OP_OPEN_PAREN:
@@ -533,6 +592,23 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
             case EK_BOOL_CONST: {
                 da_append(index_stack, temp_index);
                 da_append(type_stack, (ValueType){.kind = VT_BOOL});
+            } break;
+            case EK_STRING_CONST: {
+                da_append(index_stack, temp_index);
+
+                ValueType vt = {
+                    .kind = VT_SLICE,
+                };
+                vt.props.inner_type = malloc(sizeof(ValueType));
+                assert(vt.props.inner_type);
+
+                *vt.props.inner_type = (ValueType){
+                    .kind = VT_INT,
+                    .props.i.bits = 8,
+                    .props.i.unsign = true,
+                };
+
+                da_append(type_stack, vt);
             } break;
             case EK_VAR: {
                 Decl* decl;
@@ -742,6 +818,14 @@ Vec codegen_function_locals(Module* mod, Function* f) {
         vec_append_elem(&locals, &stack_base_local_buf);
         free(stack_base_local_buf.items);
     }
+
+    {  // temp_i64
+        ByteBuffer temp_i64_local_buf = {0};
+        bb_append_leb128_u(&temp_i64_local_buf, 1);
+        da_append(temp_i64_local_buf, 0x7E);  // i64
+        vec_append_elem(&locals, &temp_i64_local_buf);
+        free(temp_i64_local_buf.items);
+    }
     return locals;
 }
 
@@ -912,13 +996,20 @@ Section codegen_global(Module* mod) {
 
     Vec globals = {0};
 
+    size_t constants_size = 0;
+    for (size_t i = 0; i < mod->string_constants.count; i++) {
+        constants_size += mod->string_constants.items[i].len;
+    }
+
     {
         ByteBuffer stack_ptr = {0};
-        da_append(stack_ptr, 0x7F);         // i32
-        da_append(stack_ptr, 0x01);         // mut
-        da_append(stack_ptr, 0x41);         // opcode for i32.const
-        bb_append_leb128_u(&stack_ptr, 0);  // 0
-        da_append(stack_ptr, 0xB);          // opcode for end
+        da_append(stack_ptr, 0x7F);  // i32
+        da_append(stack_ptr, 0x01);  // mut
+        da_append(stack_ptr, 0x41);  // opcode for i32.const
+        bb_append_leb128_u(
+            &stack_ptr,
+            constants_size);        // start execution stack after constants
+        da_append(stack_ptr, 0xB);  // opcode for end
         vec_append_elem(&globals, &stack_ptr);
         free(stack_ptr.items);
     }
@@ -933,6 +1024,15 @@ Section codegen_exports(Module* mod) {
     Section export_section = {.id = SID_EXPORT};
 
     Vec exports = {0};
+
+    {  // memory export
+        ByteBuffer bb = {0};
+        bb_append_name(&bb, "u_memory");
+        da_append(bb, 0x02);
+        bb_append_leb128_u(&bb, 0);
+        vec_append_elem(&exports, &bb);
+        free(bb.items);
+    }
 
     for (size_t i = 0; i < mod->exports.count; i++) {
         Decl* decl = find_global_decl(mod, mod->exports.items[i].decl_name);
@@ -977,6 +1077,46 @@ Section codegen_codes(Module* mod) {
 
     bb_append_vec(&code_section.content, &codes);
     free(codes.content.items);
+
+    return code_section;
+}
+
+Section codegen_datas(Module* mod) {
+    Section code_section = {.id = SID_DATA};
+
+    Vec datas = {0};
+
+    {  // string constant data
+        ByteBuffer bb = {0};
+        bb_append_leb128_u(&bb, 0);  // active data in memory 0
+        da_append(bb, 0x41);         // opcode for i32.const
+        bb_append_leb128_u(&bb, 0);  // string constants are stored at offset 0
+        da_append(bb, 0x0B);         // opcode for end
+
+        {
+            Vec bytes = {0};
+
+            ByteBuffer byte = {0};
+
+            for (size_t i = 0; i < mod->string_constants.count; i++) {
+                StringConstant s = mod->string_constants.items[i];
+                for (size_t j = 0; j < s.len; j++) {
+                    da_append(byte, s.chars[j]);
+                    vec_append_elem(&bytes, &byte);
+                    byte.count = 0;
+                }
+            }
+
+            free(byte.items);
+            bb_append_vec(&bb, &bytes);
+        }
+
+        vec_append_elem(&datas, &bb);
+        free(bb.items);
+    }
+
+    bb_append_vec(&code_section.content, &datas);
+    free(datas.content.items);
 
     return code_section;
 }
@@ -1028,6 +1168,12 @@ ByteBuffer codegen_module(Module* mod) {
         Section code_section = codegen_codes(mod);
         bb_append_section(&gen.output_buffer, &code_section);
         free(code_section.content.items);
+    }
+
+    {  // datas
+        Section data_section = codegen_datas(mod);
+        bb_append_section(&gen.output_buffer, &data_section);
+        free(data_section.content.items);
     }
 
     return gen.output_buffer;

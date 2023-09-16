@@ -30,6 +30,20 @@ bool parse_value_type(Parser* p, ValueType* vt) {
                 .kind = VT_BOOL,
             };
             break;
+        case T_OPEN_SQUARE: {  // slice type
+            *vt = (ValueType){
+                .kind = VT_SLICE,
+            };
+            vt->props.inner_type = malloc(sizeof(ValueType));
+            assert(vt->props.inner_type);
+            parse_value_type(p, vt->props.inner_type);
+            if ((token = lexer_next_token(p->lex)) != T_CLOSE_SQUARE) {
+                loc_print(stderr, p->lex->token_start_loc);
+                fprintf(stderr, "Expected ']' closing slice type, got %d!\n",
+                        token);
+                return false;
+            }
+        } break;
         default:
             loc_print(stderr, p->lex->token_start_loc);
             fprintf(stderr, "Unexpected token in value type %d!\n", token);
@@ -58,7 +72,13 @@ bool compare_value_types(ValueType a, ValueType b) {
     if (a.kind != b.kind) return false;
     switch (a.kind) {
         case VT_INT:
-            if (a.props.i.bits != b.props.i.bits) return false;
+            if (a.props.i.bits != b.props.i.bits ||
+                a.props.i.unsign != b.props.i.unsign)
+                return false;
+            break;
+        case VT_SLICE:
+            if (!compare_value_types(*a.props.inner_type, *b.props.inner_type))
+                return false;
             break;
         case VT_NIL:
         case VT_BOOL:
@@ -389,6 +409,21 @@ bool parse_expression(Parser* p, Expression* ex,
                     .kind = EK_BOOL_CONST,
                     .props.boolean = p->lex->token_bool,
                 };
+                da_append(*ex, e);
+            } break;
+            case T_STRING: {
+                StringConstant s = {
+                    .chars = strndup(p->lex->token_str.items,
+                                     p->lex->token_str.count),
+                    .len = p->lex->token_str.count,
+                };
+
+                Expr e = {
+                    .kind = EK_STRING_CONST,
+                    .props.str_index = p->mod->string_constants.count,
+                };
+
+                da_append(p->mod->string_constants, s);
                 da_append(*ex, e);
             } break;
             case T_COMMA: {

@@ -1,5 +1,5 @@
-" syntax region NOUString start=/\v"/ skip=/\v\\./ end=/\v"/
-" highligh link NOUString String
+syntax region NOUString start=/\v"/ skip=/\v\\./ end=/\v"/
+highligh link NOUString String
 
 " syntax region NOUChar start=/\v'/ skip=/\v\\./ end=/\v'/
 " highligh link NOUChar Character
@@ -11,6 +11,8 @@ syn keyword NOUKeyword export extern fn return if else
 highligh link NOUKeyword Keyword
 
 syn keyword NOUType u8 i32 bool
+syn match NOUType "\["
+syn match NOUType "]"
 highligh link NOUType Type
 
 syn keyword NOUBoolean true false 

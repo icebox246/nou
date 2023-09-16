@@ -1,5 +1,6 @@
 #include "lex.h"
 
+#include <assert.h>
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -174,6 +175,26 @@ Token lexer_next_token(Lexer* lexer) {
         lexer->token_unsign = res_unsing;
 
         return lexer->token = T_INT;
+    } else if (lexer_current_char(lexer) == '"') {
+        lexer->token_str.count = 0;
+        do {
+            lexer_consume_char(lexer);
+            if (lexer_current_char(lexer) == '\0') {
+                loc_print(stderr, lexer->token_start_loc);
+                fprintf(stderr,
+                        "Reached end of file in before string literal end\n");
+                exit(-1);
+            }
+            if (lexer_current_char(lexer) == '\\') {
+                assert(false && "Character escape is not implemented yet");
+            }
+            da_append(lexer->token_str, lexer_current_char(lexer));
+        } while (lexer_current_char(lexer) != '"');
+
+        lexer_consume_char(lexer); // consume closing "
+        lexer->token_str.count--; // drop closing "
+
+        return lexer->token = T_STRING;
     } else {
         switch (lexer_current_char(lexer)) {
             case ':':
@@ -202,6 +223,12 @@ Token lexer_next_token(Lexer* lexer) {
             case '}':
                 lexer_consume_char(lexer);
                 return lexer->token = T_CLOSE_BRACKETS;
+            case '[':
+                lexer_consume_char(lexer);
+                return lexer->token = T_OPEN_SQUARE;
+            case ']':
+                lexer_consume_char(lexer);
+                return lexer->token = T_CLOSE_SQUARE;
             case '(':
                 lexer_consume_char(lexer);
                 return lexer->token = T_OPEN_PARENS;
@@ -235,6 +262,7 @@ Token lexer_next_token(Lexer* lexer) {
                 exit(-1);
         }
     }
+    assert(false && "Unreachable");
 }
 
 void lexer_undo_token(Lexer* lexer) {

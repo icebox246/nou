@@ -10,6 +10,8 @@ const module = await WebAssembly.instantiate(readFileSync('a.out'), {
 });
 
 const {
+    u_memory,
+
     add,
     add2,
     big,
@@ -26,7 +28,23 @@ const {
     if_statement,
     if_else_statement,
     u8_values,
+    u8_slices,
 } = module.instance.exports;
+
+/** @type {(n: BigInt)} **/
+function decodeSliceFromI64(n) {
+    const mask = (1n << 32n) - 1n;
+    return {
+        len: Number((n >> 32n) & mask),
+        ptr: Number(n & mask),
+    };
+}
+
+function decodeStringFromU8Slice(slice) {
+    const bytes = new Uint8Array(u_memory.buffer, slice.ptr, slice.len);
+    const decoder = new TextDecoder();
+    return decoder.decode(bytes);
+}
 
 function runTests(tests) {
     for (const [key, value] of Object.entries(tests)) {
@@ -35,7 +53,7 @@ function runTests(tests) {
         if (res === value.expected) {
             console.log(`Passed!`);
         } else {
-            console.log(`Failed: expected "${value.expected}", got "${res}"`);
+            console.log("Failed: expected: ", value.expected, "; got: ", res);
         }
     }
 }
@@ -112,5 +130,9 @@ runTests({
     u8_values: {
         expr: () => u8_values(),
         expected: 42,
+    },
+    u8_slices: {
+        expr: () => decodeStringFromU8Slice(decodeSliceFromI64(u8_slices())),
+        expected: "Hello, World!",
     },
 });

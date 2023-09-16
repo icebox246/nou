@@ -6,11 +6,14 @@
 #include <stdint.h>
 #include <stdio.h>
 
+#include "da.h"
+
 typedef enum {
     T_END = 0,
     T_IDENT,
     T_INT,
     T_BOOL,
+    T_STRING,
     T_COLON,
     T_SEMICOLON,
     T_ASSIGN,
@@ -25,6 +28,8 @@ typedef enum {
     T_SLASH,
     T_OPEN_BRACKETS,
     T_CLOSE_BRACKETS,
+    T_OPEN_SQUARE,
+    T_CLOSE_SQUARE,
     T_OPEN_PARENS,
     T_CLOSE_PARENS,
 
@@ -48,6 +53,10 @@ typedef struct {
 } Location;
 
 typedef struct {
+    da_list(char);
+} StringContent;
+
+typedef struct {
     char* input_buffer;
     size_t input_size;
     size_t offset;
@@ -58,6 +67,7 @@ typedef struct {
     int token_bits;
     bool token_unsign;
     bool token_bool;
+    StringContent token_str;
     Location token_start_loc;
     Location token_end_loc;
 } Lexer;
