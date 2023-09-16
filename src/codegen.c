@@ -73,12 +73,13 @@ static void bb_append_bb(ByteBuffer* bb, ByteBuffer* other) {
 }
 
 static void bb_append_leb128_u(ByteBuffer* bb, uint64_t x) {
-    do {
+    while (x) {
         uint8_t byte = (x & 0x7F);
         x >>= 7;
-        if (x) byte |= 0x80;
+        byte |= 0x80;
         da_append(*bb, byte);
-    } while (x);
+    }
+    da_append(*bb, 0);
 }
 
 static void bb_append_name(ByteBuffer* bb, char* name) {
@@ -265,9 +266,53 @@ void bb_append_applying_bitmask_i32(ByteBuffer* bb, int bits) {
 
 bool get_string_constant_offset(Module* mod, size_t index, size_t* offset) {
     if (index > mod->string_constants.count) return false;
-    *offset = 0;
+    if (offset) *offset = 0;
     for (size_t i = 0; i < index; i++) {
-        offset += mod->string_constants.items[i].len;
+        if (offset) *offset += mod->string_constants.items[i].len;
+    }
+    return true;
+}
+
+bool bb_append_loading_value(ByteBuffer* e, Module* mod, ValueType vt,
+                             size_t offset) {
+    switch (vt.kind) {
+        case VT_INT:
+            switch (vt.props.i.bits) {
+                case 8:
+                    da_append(*e,
+                              0x2D);           // opcode for i32.load8_u
+                    bb_append_leb128_u(e, 0);  // align
+                    bb_append_leb128_u(e,
+                                       offset);  // offset
+                    break;
+                case 32:
+                    da_append(*e,
+                              0x28);           // opcode for i32.load
+                    bb_append_leb128_u(e, 0);  // align
+                    bb_append_leb128_u(e,
+                                       offset);  // offset
+                    break;
+                default:
+                    fprintf(stderr,
+                            "%d-bit integers are not "
+                            "supported!\n",
+                            vt.props.i.bits);
+                    return false;
+            }
+            break;
+        case VT_BOOL:
+            da_append(*e, 0x2D);            // opcode for i32.load8_u
+            bb_append_leb128_u(e, 0);       // align
+            bb_append_leb128_u(e, offset);  // offset
+            break;
+        case VT_SLICE:
+            da_append(*e, 0x29);            // opcode for i64.load
+            bb_append_leb128_u(e, 0);       // align
+            bb_append_leb128_u(e, offset);  // offset
+            break;
+        default:
+            fprintf(stderr, "Unsupported variable type!\n");
+            return false;
     }
     return true;
 }
@@ -347,48 +392,8 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
                         da_append(e, 0x20);  // opcode for local.get
                         bb_append_leb128_u(&e, stack_base_index);
 
-                        switch (var_decl->value.vt.kind) {
-                            case VT_INT:
-                                switch (var_decl->value.vt.props.i.bits) {
-                                    case 8:
-                                        da_append(
-                                            e,
-                                            0x2D);  // opcode for i32.load8_u
-                                        bb_append_leb128_u(&e, 0);  // align
-                                        bb_append_leb128_u(
-                                            &e,
-                                            var_index);  // offset
-                                        break;
-                                    case 32:
-                                        da_append(e,
-                                                  0x28);  // opcode for i32.load
-                                        bb_append_leb128_u(&e, 0);  // align
-                                        bb_append_leb128_u(
-                                            &e,
-                                            var_index);  // offset
-                                        break;
-                                    default:
-                                        fprintf(
-                                            stderr,
-                                            "%d-bit integers are not "
-                                            "supported!\n",
-                                            var_decl->value.vt.props.i.bits);
-                                        assert(false && "Unsupported int size");
-                                }
-                                break;
-                            case VT_BOOL:
-                                da_append(e, 0x2D);  // opcode for i32.load8_u
-                                bb_append_leb128_u(&e, 0);          // align
-                                bb_append_leb128_u(&e, var_index);  // offset
-                                break;
-                            case VT_SLICE:
-                                da_append(e, 0x29);  // opcode for i64.load
-                                bb_append_leb128_u(&e, 0);          // align
-                                bb_append_leb128_u(&e, var_index);  // offset
-                                break;
-                            default:
-                                assert(false && "Unsupported variable type");
-                        }
+                        assert(bb_append_loading_value(
+                            &e, mod, var_decl->value.vt, var_index));
                     }
                 } break;
             }
@@ -459,6 +464,37 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
                            decision.right_type.kind == VT_BOOL);
                     da_append(e, 0x71);  // opcode for i32.and
                     break;
+                case OP_INDEXING: {
+                    assert(decision.left_type.kind == VT_SLICE &&
+                           decision.right_type.kind == VT_INT);
+
+                    ValueType item_type = *decision.left_type.props.inner_type;
+
+                    size_t temp_i32_index;
+                    assert(find_temp_i32_index(mod, scope, &temp_i32_index));
+
+                    da_append(e, 0x21);  // opcode for local.set
+                    bb_append_leb128_u(&e, temp_i32_index);
+
+                    da_append(e, 0xA7);  // opcode for i32.wrap_i64
+
+                    da_append(e, 0x20);  // opcode for local.get
+                    bb_append_leb128_u(&e, temp_i32_index);
+
+                    size_t size_of_item =
+                        get_size_of_value_type(mod, item_type);
+
+                    if (size_of_item != 1) {
+                        da_append(e, 0x41);  // opcode for i32.const
+                        bb_append_leb128_u(&e, size_of_item);
+                        da_append(e, 0x6C);  // opcode for i32.mul
+                    }
+
+                    da_append(e, 0x6A);  // opcode for i32.add
+
+                    if (!decision.take_reference)
+                        assert(bb_append_loading_value(&e, mod, item_type, 0));
+                } break;
                 case OP_ASSIGNEMENT: {
                     if (!compare_value_types(decision.left_type,
                                              decision.right_type)) {
@@ -640,6 +676,17 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
                             type_stack,
                             decision.left_type);  // TODO maybe there should be
                                                   // a smarter system for that
+                    } break;
+                    case OP_INDEXING: {
+                        index_stack.count -= 2;
+                        type_stack.count -= 2;
+
+                        assert(decision.left_type.kind == VT_SLICE &&
+                               "Cannot index non slice values");
+
+                        da_append(index_stack, i);
+                        da_append(type_stack,
+                                  *decision.left_type.props.inner_type);
                     } break;
                     case OP_EQUALITY: {
                         index_stack.count -= 2;

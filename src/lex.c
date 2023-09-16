@@ -258,6 +258,9 @@ Token lexer_next_token(Lexer* lexer) {
             case '/':
                 lexer_consume_char(lexer);
                 return lexer->token = T_SLASH;
+            case '!':
+                lexer_consume_char(lexer);
+                return lexer->token = T_EXCLAMATION;
             default:
                 fprintf(stderr, "%d:%d: Unknown token starting with: '%c'\n",
                         (int)lexer->token_start_loc.line,

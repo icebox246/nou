@@ -211,6 +211,9 @@ bool parse_function_type(Parser* p, Function* f) {
 
 size_t operator_precedence(OperatorKind op) {
     switch (op) {
+        case OP_INDEXING:
+            return 7;
+
         case OP_MULTIPLICATION:
         case OP_REMAINDER:
         case OP_DIVISION:
@@ -253,6 +256,7 @@ size_t operator_associativity(OperatorKind op) {
         case OP_EQUALITY:
         case OP_ALTERNATIVE:
         case OP_CONJUNCTION:
+        case OP_INDEXING:
             return OPA_LEFT;
 
         case OP_ASSIGNEMENT:
@@ -284,6 +288,8 @@ OperatorKind operator_of_token(Token tok) {
             return OP_ALTERNATIVE;
         case KW_AND:
             return OP_CONJUNCTION;
+        case T_EXCLAMATION:
+            return OP_INDEXING;
         default:
             return -1;
     }

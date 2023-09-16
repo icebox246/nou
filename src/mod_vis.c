@@ -91,6 +91,9 @@ void visualize_expr(Expr* e, Visualizer* v) {
                 case OP_CONJUNCTION:
                     fprintf(v->file, "and");
                     break;
+                case OP_INDEXING:
+                    fprintf(v->file, "!");
+                    break;
 
                 case OP_OPEN_PAREN:
                 case OP_FUNC_CALL:

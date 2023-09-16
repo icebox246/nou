@@ -83,6 +83,7 @@ typedef enum {
     OP_EQUALITY,
     OP_ALTERNATIVE,
     OP_CONJUNCTION,
+    OP_INDEXING,
 
     OP_OPEN_PAREN,
     OP_FUNC_CALL,

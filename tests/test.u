@@ -17,6 +17,7 @@ export if_else_statement;
 export u8_values;
 export u32_values;
 export u8_slices;
+export slice_indexing;
 
 // adds two numbers 
 add := fn a: i32, b: i32 -> i32 {
@@ -131,6 +132,16 @@ u32_values := fn -> u32 {
 
 // test for u8 slices
 u8_slices := fn -> [u8] {
+    foo := [u8] "Not hello...";
     str := [u8] "Hello, World!";
     return str;
+};
+
+// test for slice indexing
+slice_indexing := fn -> u8 {
+    slice := [u8] "ABC";
+    if (slice!1 == 66u8) {
+        slice!1 = 42u8;
+    }
+    return slice!1;
 };
