@@ -17,6 +17,7 @@ export if_else_statement;
 export u8_values;
 export u32_values;
 export u8_slices;
+export char_escape_in_string;
 export slice_indexing;
 export slice_mutation;
 
@@ -136,6 +137,11 @@ u8_slices := fn -> [u8] {
     foo := [u8] "Not hello...";
     str := [u8] "Hello, World!";
     return str;
+};
+
+// test for character escaping
+char_escape_in_string := fn -> [u8] {
+    return "Hello\nHello\"Hi";
 };
 
 // test for slice indexing

@@ -30,6 +30,7 @@ const {
     u8_values,
     u32_values,
     u8_slices,
+    char_escape_in_string,
     slice_indexing,
     slice_mutation,
 } = module.instance.exports;
@@ -141,6 +142,10 @@ runTests({
     u8_slices: {
         expr: () => decodeStringFromU8Slice(decodeSliceFromI64(u8_slices())),
         expected: "Hello, World!",
+    },
+    char_escape_in_string: {
+        expr: () => decodeStringFromU8Slice(decodeSliceFromI64(char_escape_in_string())),
+        expected: "Hello\nHello\"Hi",
     },
     slice_indexing: {
         expr: () => slice_indexing(),

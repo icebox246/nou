@@ -181,7 +181,9 @@ Token lexer_next_token(Lexer* lexer) {
         return lexer->token = T_INT;
     } else if (lexer_current_char(lexer) == '"') {
         lexer->token_str.count = 0;
+        bool escaped;
         do {
+            escaped = false;
             lexer_consume_char(lexer);
             if (lexer_current_char(lexer) == '\0') {
                 loc_print(stderr, lexer->token_start_loc);
@@ -190,13 +192,24 @@ Token lexer_next_token(Lexer* lexer) {
                 exit(-1);
             }
             if (lexer_current_char(lexer) == '\\') {
-                assert(false && "Character escape is not implemented yet");
+                lexer_consume_char(lexer);
+                char c = lexer_current_char(lexer);
+                escaped = true;
+                switch (c) {
+                    case 'n':
+                        da_append(lexer->token_str, '\n');
+                        break;
+                    default:
+                        da_append(lexer->token_str, c);
+                        break;
+                }
+            } else {
+                da_append(lexer->token_str, lexer_current_char(lexer));
             }
-            da_append(lexer->token_str, lexer_current_char(lexer));
-        } while (lexer_current_char(lexer) != '"');
+        } while (lexer_current_char(lexer) != '"' || escaped);
 
-        lexer_consume_char(lexer); // consume closing "
-        lexer->token_str.count--; // drop closing "
+        lexer_consume_char(lexer);  // consume closing "
+        lexer->token_str.count--;   // drop closing "
 
         return lexer->token = T_STRING;
     } else {
