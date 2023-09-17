@@ -85,32 +85,23 @@ log_int := fn n: i32 {
   // allocate a buffer for 128 chars
   buf := [u8] mem_alloc_slice(128u32);
 
-  _digit := fn x: i32, prev: [u8], _conv: [i32] -> [u8] {
+  _digit := fn x: i32, prev: [u8] -> [u8] {
     if (x == 0) return prev;
 
-    _conv!0 = x % 10;
-    conv_u8 := [u8];
-    conv_u8.len = 1u32;
-    conv_u8.ptr = _conv.ptr;
+    next := [u8];
+    next.ptr = prev.ptr - 1u32;
+    next.len = prev.len + 1u32;
 
-    my := [u8];
-    my.ptr = prev.ptr - 1u32;
-    my.len = prev.len + 1u32;
-    my!0 = conv_u8!0 + 48u8;
+    next!0 = (x % 10) as u8 + 48u8;
 
-    return _digit(x / 10, my, _conv);
+    return _digit(x / 10, next);
   };
 
   out := [u8];
   out.len = 0u32;
   out.ptr = buf.ptr + buf.len;
 
-  // temporary place to convert between i32 and u8 
-  conv := [i32];
-  conv.len = 1u32;
-  conv.ptr = buf.ptr;
-
-  out = _digit(n, out, conv);
+  out = _digit(n, out);
 
   log(out);
 
@@ -137,24 +128,14 @@ extern ask := fn buf: [u8] -> [u8];
 ask_int := fn -> i32 {
     buf := [u8] mem_alloc_slice(128u32 + 4u32);
 
-    conv := [i32];
-    conv.len = 1u32;
-    conv.ptr = buf.ptr + 128u32;
-    conv!0 = 0;
-
     inp := [u8] ask(buf);
 
-    _digit := fn _inp: [u8], i: u32, _conv: [i32], _out: i32 -> i32 {
+    _digit := fn _inp: [u8], i: u32, _out: i32 -> i32 {
         if (i == _inp.len) return _out;
-        conv_u8 := [u8];
-        conv_u8.len = 1u32;
-        conv_u8.ptr = _conv.ptr;
-        conv_u8!0 = _inp!i - 48u8;
-
-        return _digit(_inp, i+1u32, _conv, _out * 10 + _conv!0);
+        return _digit(_inp, i+1u32, _out * 10 + (_inp!i as i32 - 48));
     };
 
-    out := i32 _digit(inp, 0u32, conv, 0);
+    out := i32 _digit(inp, 0u32, 0);
 
     mem_free_slice(buf);
 
