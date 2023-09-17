@@ -36,6 +36,7 @@ syn match NOUOperator "%"
 syn match NOUOperator "\<and\>"
 syn match NOUOperator "\<or\>"
 syn match NOUOperator "!"
+syn match NOUOperator "\<as\>"
 highligh link NOUOperator Operator
 
 syn match NOUDelimiter ":"

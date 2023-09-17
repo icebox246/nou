@@ -35,6 +35,7 @@ typedef enum {
     T_OPEN_PARENS,
     T_CLOSE_PARENS,
 
+    KW_AS,
     KW_FN,
     KW_IF,
     KW_ELSE,

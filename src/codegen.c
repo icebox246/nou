@@ -595,6 +595,7 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
                 case OP_OPEN_PAREN:
                 case OP_FUNC_CALL:
                 case OP_FIELD_ACCESS:
+                case OP_CASTING:
                     assert(false && "Unreachable");
             }
         } break;
@@ -654,6 +655,15 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
                 }
             } else {
                 assert("Unimplemented");
+            }
+        } break;
+        case EK_CASTING: {
+            if (!decision.take_reference) {
+                assert(decision.left_type.kind == VT_INT &&
+                       decision.right_type.kind == VT_INT);
+
+                bb_append_applying_bitmask_i32(
+                    &e, decision.right_type.props.i.bits);
             }
         } break;
     }
@@ -770,12 +780,10 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
                         da_append(type_stack, decision.left_type);
                     } break;
 
-                    case OP_FIELD_ACCESS:
-                        assert(false && "Unimplemented");
-                        break;
-
                     case OP_OPEN_PAREN:
                     case OP_FUNC_CALL:
+                    case OP_FIELD_ACCESS:
+                    case OP_CASTING:
                         assert(false && "Unreachable");
                         break;
                 }
@@ -841,6 +849,29 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
                 // push field object on stack
                 da_append(index_stack, i);
                 da_append(type_stack, vt);
+            } break;
+            case EK_CASTING: {
+                assert(type_stack.count > 0 &&
+                       "There has to be a value to be casted");
+
+                ValueType from_type = type_stack.items[type_stack.count - 1];
+
+                decision.left_type = from_type;
+                decision.right_type = e->props.cast_target;
+
+                assert(from_type.kind == VT_INT &&
+                       e->props.cast_target.kind == VT_INT &&
+                       "Casting is implemeted only for ints");
+
+                decision.dependency = index_stack.items[index_stack.count - 1];
+
+                // pop old type
+                index_stack.count--;
+                type_stack.count--;
+
+                // push new type
+                da_append(index_stack, i);
+                da_append(type_stack, e->props.cast_target);
             } break;
         }
         da_append(decisions, decision);

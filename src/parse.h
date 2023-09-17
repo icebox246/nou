@@ -72,6 +72,7 @@ typedef enum {
     EK_OPERATOR,
     EK_FUNC_CALL,
     EK_FIELD_ACCESS,
+    EK_CASTING,
 } ExprKind;
 
 typedef enum {
@@ -89,6 +90,7 @@ typedef enum {
     OP_OPEN_PAREN,
     OP_FUNC_CALL,
     OP_FIELD_ACCESS,
+    OP_CASTING,
 } OperatorKind;
 
 typedef struct {
@@ -105,6 +107,7 @@ typedef struct {
         char* func;
         size_t str_index;
         char* field_name;
+        ValueType cast_target;
     } props;
 } Expr;
 

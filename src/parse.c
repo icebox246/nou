@@ -212,6 +212,7 @@ bool parse_function_type(Parser* p, Function* f) {
 size_t operator_precedence(OperatorKind op) {
     switch (op) {
         case OP_INDEXING:
+        case OP_CASTING:
             return 8;
 
         case OP_FIELD_ACCESS:
@@ -262,6 +263,7 @@ size_t operator_associativity(OperatorKind op) {
         case OP_CONJUNCTION:
         case OP_INDEXING:
         case OP_FIELD_ACCESS:
+        case OP_CASTING:
             return OPA_LEFT;
 
         case OP_ASSIGNEMENT:
@@ -305,14 +307,58 @@ typedef enum {
     EPTM_ON_MISMATCHED_PAREN,
 } ExpressionParsingTerminationMode;
 
+typedef struct {
+    da_list(OperatorKind);
+} OperatorKinds;
+typedef struct {
+    da_list(char*);
+} Names;
+typedef struct {
+    da_list(ValueType);
+} ValueTypes;
+
+bool emit_operator(OperatorKinds* op_stack, Names* name_stack,
+                   ValueTypes* cast_type_stack, Expression* ex) {
+    OperatorKind op = op_stack->items[op_stack->count - 1];
+
+    switch (op) {
+        case OP_FIELD_ACCESS: {
+            assert(name_stack->count);
+            Expr e = {
+                .kind = EK_FIELD_ACCESS,
+                .props.field_name = name_stack->items[name_stack->count - 1],
+            };
+            name_stack->count--;
+            da_append(*ex, e);
+        } break;
+        case OP_CASTING: {
+            assert(cast_type_stack->count);
+            Expr e = {
+                .kind = EK_CASTING,
+                .props.cast_target =
+                    cast_type_stack->items[cast_type_stack->count - 1],
+            };
+            cast_type_stack->count--;
+            da_append(*ex, e);
+        } break;
+        default: {
+            Expr e = {
+                .kind = EK_OPERATOR,
+                .props.op = op,
+            };
+            da_append(*ex, e);
+        }
+    }
+    op_stack->count--;
+
+    return true;
+}
+
 bool parse_expression(Parser* p, Expression* ex,
                       ExpressionParsingTerminationMode termination_mode) {
-    struct {
-        da_list(OperatorKind);
-    } op_stack = {0};
-    struct {
-        da_list(char*);
-    } name_stack = {0};
+    OperatorKinds op_stack = {0};
+    Names name_stack = {0};
+    ValueTypes cast_type_stack = {0};
 
     bool parsing = true;
 
@@ -338,6 +384,17 @@ bool parse_expression(Parser* p, Expression* ex,
                 new_op = OP_FIELD_ACCESS;
             }
 
+            if (token == KW_AS) {  // special handling for casting operator
+                ValueType target_type;
+                if (!parse_value_type(p, &target_type)) {
+                    loc_print(stderr, p->lex->token_start_loc);
+                    fprintf(stderr, "Failed to parse type in `as` operator\n");
+                    return false;
+                }
+                da_append(cast_type_stack, target_type);
+                new_op = OP_CASTING;
+            }
+
             if (new_op != -1) {
                 OperatorKind top_op;
                 while (op_stack.count &&
@@ -348,28 +405,7 @@ bool parse_expression(Parser* p, Expression* ex,
                         (operator_precedence(top_op) ==
                              operator_precedence(new_op) &&
                          operator_associativity(new_op) == OPA_LEFT))) {
-                    // POPPING OPS
-                    OperatorKind op = op_stack.items[op_stack.count - 1];
-                    switch (op) {
-                        case OP_FIELD_ACCESS: {
-                            assert(name_stack.count);
-                            Expr e = {
-                                .kind = EK_FIELD_ACCESS,
-                                .props.field_name =
-                                    name_stack.items[name_stack.count - 1],
-                            };
-                            name_stack.count--;
-                            da_append(*ex, e);
-                        } break;
-                        default: {
-                            Expr e = {
-                                .kind = EK_OPERATOR,
-                                .props.op = op,
-                            };
-                            da_append(*ex, e);
-                        }
-                    }
-                    op_stack.count--;
+                    emit_operator(&op_stack, &name_stack, &cast_type_stack, ex);
                 }
                 da_append(op_stack, new_op);
                 continue;
@@ -386,28 +422,7 @@ bool parse_expression(Parser* p, Expression* ex,
 
                 while (!mismatched_paren && op_stack.count > 0 &&
                        op_stack.items[op_stack.count - 1] != OP_OPEN_PAREN) {
-                    // POPPING OPS
-                    OperatorKind op = op_stack.items[op_stack.count - 1];
-                    switch (op) {
-                        case OP_FIELD_ACCESS: {
-                            assert(name_stack.count);
-                            Expr e = {
-                                .kind = EK_FIELD_ACCESS,
-                                .props.field_name =
-                                    name_stack.items[name_stack.count - 1],
-                            };
-                            name_stack.count--;
-                            da_append(*ex, e);
-                        } break;
-                        default: {
-                            Expr e = {
-                                .kind = EK_OPERATOR,
-                                .props.op = op,
-                            };
-                            da_append(*ex, e);
-                        }
-                    }
-                    op_stack.count--;
+                    emit_operator(&op_stack, &name_stack, &cast_type_stack, ex);
                     if (op_stack.count == 0) {
                         mismatched_paren = true;
                         break;
@@ -490,28 +505,7 @@ bool parse_expression(Parser* p, Expression* ex,
             case T_COMMA: {
                 while (op_stack.count &&
                        op_stack.items[op_stack.count - 1] != OP_OPEN_PAREN) {
-                    // POPPING OPS
-                    OperatorKind op = op_stack.items[op_stack.count - 1];
-                    switch (op) {
-                        case OP_FIELD_ACCESS: {
-                            assert(name_stack.count);
-                            Expr e = {
-                                .kind = EK_FIELD_ACCESS,
-                                .props.field_name =
-                                    name_stack.items[name_stack.count - 1],
-                            };
-                            name_stack.count--;
-                            da_append(*ex, e);
-                        } break;
-                        default: {
-                            Expr e = {
-                                .kind = EK_OPERATOR,
-                                .props.op = op,
-                            };
-                            da_append(*ex, e);
-                        }
-                    }
-                    op_stack.count--;
+                    emit_operator(&op_stack, &name_stack, &cast_type_stack, ex);
                 }
             } break;
             default:
@@ -523,28 +517,7 @@ bool parse_expression(Parser* p, Expression* ex,
     }
 
     while (op_stack.count) {
-        // POPPING OPS
-        OperatorKind op = op_stack.items[op_stack.count - 1];
-        assert(op != OP_OPEN_PAREN);
-        switch (op) {
-            case OP_FIELD_ACCESS: {
-                assert(name_stack.count);
-                Expr e = {
-                    .kind = EK_FIELD_ACCESS,
-                    .props.field_name = name_stack.items[name_stack.count - 1],
-                };
-                name_stack.count--;
-                da_append(*ex, e);
-            } break;
-            default: {
-                Expr e = {
-                    .kind = EK_OPERATOR,
-                    .props.op = op,
-                };
-                da_append(*ex, e);
-            }
-        }
-        op_stack.count--;
+        emit_operator(&op_stack, &name_stack, &cast_type_stack, ex);
     }
     free(op_stack.items);
     free(name_stack.items);

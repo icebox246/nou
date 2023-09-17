@@ -33,6 +33,7 @@ const {
     char_escape_in_string,
     slice_indexing,
     slice_mutation,
+    integer_casting,
 } = module.instance.exports;
 
 /** @type {(n: BigInt)} **/
@@ -154,5 +155,9 @@ runTests({
     slice_mutation: {
         expr: () => decodeStringFromU8Slice(decodeSliceFromI64(slice_mutation())),
         expected: "ello",
+    },
+    integer_casting: {
+        expr: () => integer_casting(),
+        expected: 42,
     },
 });

@@ -99,6 +99,7 @@ void visualize_expr(Expr* e, Visualizer* v) {
                 case OP_OPEN_PAREN:
                 case OP_FUNC_CALL:
                 case OP_FIELD_ACCESS:
+                case OP_CASTING:
                     assert(false && "Unreachable");
                     break;
             }
@@ -110,7 +111,11 @@ void visualize_expr(Expr* e, Visualizer* v) {
             break;
         case EK_FIELD_ACCESS:
             vis_write_indent(v);
-            fprintf(v->file, "field .%s\n", e->props.field_name);
+            fprintf(v->file, "as ");
+            visualize_value_type(e->props.cast_target, v);
+            fprintf(v->file, "\n");
+            break;
+        case EK_CASTING:
             break;
     }
 }

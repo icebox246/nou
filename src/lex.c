@@ -84,6 +84,10 @@ Token lexer_next_token(Lexer* lexer) {
         }
 
         if (lexer->token_len == 2 &&
+            strncmp("as", lexer->token_text, lexer->token_len) == 0) {
+            return lexer->token = KW_AS;
+        }
+        if (lexer->token_len == 2 &&
             strncmp("fn", lexer->token_text, lexer->token_len) == 0) {
             return lexer->token = KW_FN;
         }

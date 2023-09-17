@@ -20,6 +20,7 @@ export u8_slices;
 export char_escape_in_string;
 export slice_indexing;
 export slice_mutation;
+export integer_casting;
 
 // adds two numbers 
 add := fn a: i32, b: i32 -> i32 {
@@ -163,4 +164,10 @@ slice_mutation := fn -> [u8] {
         return sub_slice;
     else
         return slice;
+};
+
+// test integer value casting
+integer_casting := fn -> u8 {
+    a := i32 42 + 1024;
+    return a as u8;
 };
