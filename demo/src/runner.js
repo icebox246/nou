@@ -89,6 +89,6 @@ export class Runner {
     }
 
     getOutput() {
-        return this.output.join("\n") + "\n";
+        return this.output.join("");
     }
 }

@@ -5,6 +5,7 @@ export run;
 //     log := fn x: [u8];           -- prints strings
 //     log_int := fn x: i32;        -- prints numbers
 //     log_bool := fn b: bool;      -- prints booleans
+//     log_nl := fn;                -- prints new line
 // 
 // to ask user for input use
 //     ask := fn buf: [u8] -> [u8]; -- reads a string from user into buf
@@ -16,18 +17,25 @@ export run;
 
 // this is the entry point of the app
 run := fn {
-  log("Hello, U");
+  log("=====================\n");
+  log("Hello, U!\n");
 
   // add 1 and 2, and store the result in res
   res := i32 add(1, 2);
+  log("res = ")
   log_int(res);
+  log_nl();
 
   // checks whether passed value is even
   is_even := fn n: i32 -> bool { return n % 2 == 0; };
+  log("is_even(res) = ");
   log_bool(is_even(res));
+  log_nl();
 
-  // print 10th fibonacci number
+  log("10th fibonacci number is ");
   log_int(fib(10));
+  log_nl();
+
   // gives nth fibonacci number
   fib := fn n: i32 -> i32 {
     if (n == 0)
@@ -36,6 +44,8 @@ run := fn {
       return 1;
     return fib(n - 1) + fib(n - 2);
   };
+
+  log("=====================\n");
 
   // uncomment lines below to see interactive example
   //greet();
@@ -50,8 +60,9 @@ greet := fn {
   buf := [u8] mem_alloc_slice(128u32);
 
   name := [u8] ask(buf);
-  log("Nice to meet you");
+  log("Nice to meet you ");
   log(name);
+  log("!\n");
 
   mem_free_slice(buf);
 };
@@ -59,7 +70,9 @@ greet := fn {
 interactive_doubling := fn {
   num := i32;
   num = ask_int();
+  log("Your result is: ");
   log_int(2 * num);
+  log_nl();
 };
 
 ////////////// logging to output
@@ -110,6 +123,10 @@ log_bool := fn b: bool {
     log("true");
   else
     log("false");
+};
+
+log_nl := fn {
+  log("\n");
 };
 
 ////////////// user input prompting
