@@ -1130,7 +1130,7 @@ Section codegen_mem(Module* mod) {
     {
         ByteBuffer memory0 = {0};
         da_append(memory0, 0x00);  // limit: min..
-        bb_append_leb128_u(&memory0, 1);
+        bb_append_leb128_u(&memory0, 2);
         vec_append_elem(&mems, &memory0);
         free(memory0.items);
     }

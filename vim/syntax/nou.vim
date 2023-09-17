@@ -10,7 +10,7 @@ highligh link NOUNumber Number
 syn keyword NOUKeyword export extern fn return if else
 highligh link NOUKeyword Keyword
 
-syn keyword NOUType u8 i32 bool
+syn keyword NOUType u8 i32 u32 bool
 syn match NOUType "\["
 syn match NOUType "]"
 highligh link NOUType Type
@@ -35,6 +35,7 @@ syn match NOUOperator "/"
 syn match NOUOperator "%"
 syn match NOUOperator "\<and\>"
 syn match NOUOperator "\<or\>"
+syn match NOUOperator "!"
 highligh link NOUOperator Operator
 
 syn match NOUDelimiter ":"

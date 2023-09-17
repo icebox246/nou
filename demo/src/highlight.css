@@ -33,3 +33,11 @@
 .hi-co * {
     color: var(--hi-comment) !important;
 }
+
+.hi-st {
+    color: var(--hi-string);
+}
+
+.hi-st * {
+    color: var(--hi-string) !important;
+}

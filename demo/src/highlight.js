@@ -6,7 +6,10 @@ export function highlightCode(text) {
     }
 
     // numbers
-    text = text.replace(/(?<!\w)([0-9]+)/g, hi("nu"));
+    text = text.replace(/(?<!\w)([0-9]+([ui][0-9]+)?)/g, hi("nu"));
+    
+    // strings
+    text = text.replace(/("[^"]*")/g, hi("st"));
 
     // keywords
     text = text.replace(/(?<!\w)(export)(?!\w)/g, hi("kw"));
@@ -17,7 +20,11 @@ export function highlightCode(text) {
     text = text.replace(/(?<!\w)(else)(?!\w)/g, hi("kw"));
 
     // types
+    text = text.replace(/(\[)/g, hi("ty"));
+    text = text.replace(/(\])/g, hi("ty"));
+    text = text.replace(/(?<!\w)(u8)(?!\w)/g, hi("ty"));
     text = text.replace(/(?<!\w)(i32)(?!\w)/g, hi("ty"));
+    text = text.replace(/(?<!\w)(u32)(?!\w)/g, hi("ty"));
     text = text.replace(/(?<!\w)(bool)(?!\w)/g, hi("ty"));
 
     // boolean
@@ -38,6 +45,7 @@ export function highlightCode(text) {
     text = text.replace(/(%)/g, hi("op"));
     text = text.replace(/(?<!\w)(and)(?!\w)/g, hi("op"));
     text = text.replace(/(?<!\w)(or)(?!\w)/g, hi("op"));
+    text = text.replace(/(!)/g, hi("op"));
 
     // delimiters
     text = text.replace(/(:)(?!=)/g, hi("de"));
@@ -49,6 +57,7 @@ export function highlightCode(text) {
     text = text.replace(/(;)/g, hi("de"));
     text = text.replace(/(->)/g, hi("de"));
     text = text.replace(/(:=)/g, hi("de"));
+    text = text.replace(/(\.)/g, hi("de"));
 
     // comments
     text = text.replace(/(\/\/.*\n)/g, hi("co"));

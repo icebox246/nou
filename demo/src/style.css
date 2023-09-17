@@ -17,6 +17,7 @@
     --hi-operator: #C0A36E;
     --hi-delimiter: #9CABCA;
     --hi-comment: #727169;
+    --hi-string: #98BB6C;
 }
 
 @media (prefers-color-scheme: light) {

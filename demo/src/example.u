@@ -1,15 +1,23 @@
 // make run visible outside the app
 export run;
 
-// logs int value to output
-extern log_int := fn x: i32;
-// logs boolean value to output
-extern log_bool := fn b: bool;
-// asks user for int value
-extern get_int := fn default: i32 -> i32;
+// for printing values to output you can use
+//     log := fn x: [u8];           -- prints strings
+//     log_int := fn x: i32;        -- prints numbers
+//     log_bool := fn b: bool;      -- prints booleans
+// 
+// to ask user for input use
+//     ask := fn buf: [u8] -> [u8]; -- reads a string from user into buf
+//     ask_int := fn -> i32;        -- reads a number from user
+//
+// to allocate memory use
+//     mem_alloc_slice := fn size: u32 -> [u8] -- returns allocated [u8]
+//     mem_free_slice := fn slice: [u8]        -- frees provided [u8]
 
 // this is the entry point of the app
 run := fn {
+  log("Hello, U");
+
   // add 1 and 2, and store the result in res
   res := i32 add(1, 2);
   log_int(res);
@@ -29,7 +37,8 @@ run := fn {
     return fib(n - 1) + fib(n - 2);
   };
 
-  // uncomment line below to see interactive example
+  // uncomment lines below to see interactive example
+  //greet();
   //interactive_doubling();
 };
 
@@ -37,10 +46,156 @@ add := fn a: i32, b: i32 -> i32 {
   return a + b;
 };
 
+greet := fn {
+  buf := [u8] mem_alloc_slice(128u32);
+
+  name := [u8] ask(buf);
+  log("Nice to meet you");
+  log(name);
+
+  mem_free_slice(buf);
+};
+
 interactive_doubling := fn {
   num := i32;
-  num = get_int(21);
+  num = ask_int();
   log_int(2 * num);
 };
 
+////////////// logging to output
 
+// logs string value to output
+extern log := fn x: [u8];
+
+// logs int value to output
+log_int := fn n: i32 {
+  // allocate a buffer for 128 chars
+  buf := [u8] mem_alloc_slice(128u32);
+
+  _digit := fn x: i32, prev: [u8], _conv: [i32] -> [u8] {
+    if (x == 0) return prev;
+
+    _conv!0 = x % 10;
+    conv_u8 := [u8];
+    conv_u8.len = 1u32;
+    conv_u8.ptr = _conv.ptr;
+
+    my := [u8];
+    my.ptr = prev.ptr - 1u32;
+    my.len = prev.len + 1u32;
+    my!0 = conv_u8!0 + 48u8;
+
+    return _digit(x / 10, my, _conv);
+  };
+
+  out := [u8];
+  out.len = 0u32;
+  out.ptr = buf.ptr + buf.len;
+
+  // temporary place to convert between i32 and u8 
+  conv := [i32];
+  conv.len = 1u32;
+  conv.ptr = buf.ptr;
+
+  out = _digit(n, out, conv);
+
+  log(out);
+
+  mem_free_slice(buf);
+};
+
+// logs boolean value to output
+log_bool := fn b: bool {
+  if (b) 
+    log("true");
+  else
+    log("false");
+};
+
+////////////// user input prompting
+
+extern ask := fn buf: [u8] -> [u8];
+
+// asks user for int value
+ask_int := fn -> i32 {
+    buf := [u8] mem_alloc_slice(128u32 + 4u32);
+
+    conv := [i32];
+    conv.len = 1u32;
+    conv.ptr = buf.ptr + 128u32;
+    conv!0 = 0;
+
+    inp := [u8] ask(buf);
+
+    _digit := fn _inp: [u8], i: u32, _conv: [i32], _out: i32 -> i32 {
+        if (i == _inp.len) return _out;
+        conv_u8 := [u8];
+        conv_u8.len = 1u32;
+        conv_u8.ptr = _conv.ptr;
+        conv_u8!0 = _inp!i - 48u8;
+
+        return _digit(_inp, i+1u32, _conv, _out * 10 + _conv!0);
+    };
+
+    out := i32 _digit(inp, 0u32, conv, 0);
+
+    mem_free_slice(buf);
+
+    return out;
+};
+
+////////////// memory allocation
+
+// allocate [u8] of provided size
+mem_alloc_slice := fn size: u32 -> [u8] {
+  page_count := u32 (size + 511u32) / 512u32;
+  page_allocation_table := [u32] _mem_get_page_allocation_table();
+  _find := fn table: [u32], i: u32, c: u32 -> u32 {
+    _check := fn _table: [u32], j: u32, end: u32 -> bool {
+      if (j == end) return true;
+      if (_table!j == 0u32) return _check(_table, j + 1u32, end);
+      return false;
+    };
+    if (_check(table, i, i + c)) {
+      return i;
+    } else {
+      return _find(table, i + table!i, c);
+    }
+  };
+  first_available := u32 _find(page_allocation_table, 1u32, page_count);
+  page_allocation_table!first_available = page_count;
+  slice := [u8] _mem_get_memory_pages(first_available, page_count);
+  slice.len = size;
+  return slice;
+};
+
+// free allocated [u8]
+mem_free_slice := fn slice: [u8] {
+  page_index := u32 slice.ptr / 512u32;
+  page_allocation_table := [u32] _mem_get_page_allocation_table();
+  page_allocation_table!page_index = 0u32;
+};
+
+_mem_get_allocable_region := fn -> [u8] {
+  region := [u8];
+  region.len = 64u32 * 1024u32;
+  region.ptr = 64u32 * 1024u32;
+  return region;
+};
+
+// page 0 is reserved  for page_allocation_table
+_mem_get_page_allocation_table := fn -> [u32] {
+  heap_region := [u8] _mem_get_allocable_region();
+  page_allocation_table := [u32];
+  page_allocation_table.len = 128u32; // max number of pages
+  page_allocation_table.ptr = heap_region.ptr; // starts at heap region start
+  return page_allocation_table;
+};
+
+_mem_get_memory_pages := fn start: u32, count: u32 -> [u8] {
+  heap_region := [u8] _mem_get_allocable_region();
+  pages := [u8];
+  pages.ptr = heap_region.ptr + 512u32 * start;
+  pages.len = 512u32 * count;
+  return pages;
+};
