@@ -46,6 +46,7 @@ syn match NOUDelimiter ","
 syn match NOUDelimiter ";"
 syn match NOUDelimiter "->"
 syn match NOUDelimiter ":="
+syn match NOUDelimiter "\."
 highligh link NOUDelimiter Delimiter
 
 syntax match NOUComment "\v//.*$"

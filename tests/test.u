@@ -18,6 +18,7 @@ export u8_values;
 export u32_values;
 export u8_slices;
 export slice_indexing;
+export slice_mutation;
 
 // adds two numbers 
 add := fn a: i32, b: i32 -> i32 {
@@ -144,4 +145,16 @@ slice_indexing := fn -> u8 {
         slice!1 = 42u8;
     }
     return slice!1;
+};
+
+// test for mutating a slice
+slice_mutation := fn -> [u8] {
+    slice := [u8] "Hello, U!";
+    sub_slice := [u8] slice;
+    sub_slice.len = 4u32;
+    sub_slice.ptr = sub_slice.ptr + 1u32;
+    if (sub_slice.len == 4u32)
+        return sub_slice;
+    else
+        return slice;
 };

@@ -31,6 +31,7 @@ const {
     u32_values,
     u8_slices,
     slice_indexing,
+    slice_mutation,
 } = module.instance.exports;
 
 /** @type {(n: BigInt)} **/
@@ -144,5 +145,9 @@ runTests({
     slice_indexing: {
         expr: () => slice_indexing(),
         expected: 42,
-    }
+    },
+    slice_mutation: {
+        expr: () => decodeStringFromU8Slice(decodeSliceFromI64(slice_mutation())),
+        expected: "ello",
+    },
 });

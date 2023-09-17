@@ -71,6 +71,7 @@ typedef enum {
     EK_VAR,
     EK_OPERATOR,
     EK_FUNC_CALL,
+    EK_FIELD_ACCESS,
 } ExprKind;
 
 typedef enum {
@@ -87,6 +88,7 @@ typedef enum {
 
     OP_OPEN_PAREN,
     OP_FUNC_CALL,
+    OP_FIELD_ACCESS,
 } OperatorKind;
 
 typedef struct {
@@ -102,6 +104,7 @@ typedef struct {
         OperatorKind op;
         char* func;
         size_t str_index;
+        char* field_name;
     } props;
 } Expr;
 

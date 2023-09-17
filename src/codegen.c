@@ -40,10 +40,11 @@ typedef struct {
     ByteBuffer output_buffer;
 } Generator;
 
-typedef struct {
+typedef struct ExprDecision {
     bool take_reference;
     ValueType left_type;
     ValueType right_type;
+    size_t dependency;
 } ExprDecision;
 
 typedef struct {
@@ -318,10 +319,12 @@ bool bb_append_loading_value(ByteBuffer* e, Module* mod, ValueType vt,
 }
 
 ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
-                        size_t scope) {
+                        ExprDecisions decisions, size_t scope) {
     ByteBuffer e = {0};
     switch (ex->kind) {
         case EK_INT_CONST:
+            assert(!decision.take_reference &&
+                   "Cannot take reference to a constant");
             switch (ex->props.i.bits) {
                 case 8:
                 case 32:
@@ -337,10 +340,14 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
             }
             break;
         case EK_BOOL_CONST:
+            assert(!decision.take_reference &&
+                   "Cannot take reference to a constant");
             da_append(e, 0x41);  // opcode for i32.const
             bb_append_leb128_u(&e, ex->props.boolean);
             break;
         case EK_STRING_CONST: {
+            assert(!decision.take_reference &&
+                   "Cannot take reference to a constant");
             size_t ptr;
             assert(get_string_constant_offset(mod, ex->props.str_index, &ptr));
             size_t len = mod->string_constants.items[ex->props.str_index].len;
@@ -404,6 +411,8 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
                     assert(decision.left_type.kind == VT_INT &&
                            compare_value_types(decision.left_type,
                                                decision.right_type));
+                    assert(!decision.take_reference &&
+                           "Cannot take reference to a temporary");
                     da_append(e, 0x6A);  // opcode for i32.add
                     bb_append_applying_bitmask_i32(
                         &e, decision.left_type.props.i.bits);
@@ -412,6 +421,8 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
                     assert(decision.left_type.kind == VT_INT &&
                            compare_value_types(decision.left_type,
                                                decision.right_type));
+                    assert(!decision.take_reference &&
+                           "Cannot take reference to a temporary");
                     da_append(e, 0x6B);  // opcode for i32.sub
                     bb_append_applying_bitmask_i32(
                         &e, decision.left_type.props.i.bits);
@@ -420,6 +431,8 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
                     assert(decision.left_type.kind == VT_INT &&
                            compare_value_types(decision.left_type,
                                                decision.right_type));
+                    assert(!decision.take_reference &&
+                           "Cannot take reference to a temporary");
                     da_append(e, 0x6C);  // opcode for i32.mul
                     bb_append_applying_bitmask_i32(
                         &e, decision.left_type.props.i.bits);
@@ -428,6 +441,8 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
                     assert(decision.left_type.kind == VT_INT &&
                            compare_value_types(decision.left_type,
                                                decision.right_type));
+                    assert(!decision.take_reference &&
+                           "Cannot take reference to a temporary");
                     if (!decision.left_type.props.i.unsign) {
                         da_append(e, 0x6F);  // opcode for i32.rem_s
                     } else {
@@ -440,6 +455,8 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
                     assert(decision.left_type.kind == VT_INT &&
                            compare_value_types(decision.left_type,
                                                decision.right_type));
+                    assert(!decision.take_reference &&
+                           "Cannot take reference to a temporary");
                     if (!decision.left_type.props.i.unsign) {
                         da_append(e, 0x6D);  // opcode for i32.div_s
                     } else {
@@ -452,16 +469,22 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
                     assert(decision.left_type.kind == VT_INT &&
                            compare_value_types(decision.left_type,
                                                decision.right_type));
+                    assert(!decision.take_reference &&
+                           "Cannot take reference to a temporary");
                     da_append(e, 0x46);  // opcode for i32.eq
                     break;
                 case OP_ALTERNATIVE:
                     assert(decision.left_type.kind == VT_BOOL &&
                            decision.right_type.kind == VT_BOOL);
+                    assert(!decision.take_reference &&
+                           "Cannot take reference to a temporary");
                     da_append(e, 0x72);  // opcode for i32.or
                     break;
                 case OP_CONJUNCTION:
                     assert(decision.left_type.kind == VT_BOOL &&
                            decision.right_type.kind == VT_BOOL);
+                    assert(!decision.take_reference &&
+                           "Cannot take reference to a temporary");
                     da_append(e, 0x71);  // opcode for i32.and
                     break;
                 case OP_INDEXING: {
@@ -503,6 +526,8 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
 
                     assert(decision.left_type.kind != VT_INT ||
                            decision.left_type.props.i.bits <= 32);
+                    assert(!decision.take_reference &&
+                           "Cannot take reference to a temporary");
 
                     size_t temp_i32_index;
                     assert(find_temp_i32_index(mod, scope, &temp_i32_index));
@@ -568,10 +593,14 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
 
                 case OP_OPEN_PAREN:
                 case OP_FUNC_CALL:
+                case OP_FIELD_ACCESS:
                     assert(false && "Unreachable");
             }
         } break;
         case EK_FUNC_CALL: {
+            assert(!decision.take_reference &&
+                   "Cannot take reference to a temporary");
+
             size_t stack_base_index;
             assert(find_stack_base_index(mod, scope, &stack_base_index));
 
@@ -592,6 +621,40 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
             da_append(e, 0x10);  // opcode for call
             bb_append_leb128_u(&e, fn_index);
         } break;
+        case EK_FIELD_ACCESS: {
+            if (decision.left_type.kind == VT_SLICE) {
+                if (decision.take_reference) {
+                    assert(decision.dependency != -1);
+                    assert(decisions.items[decision.dependency].take_reference);
+                    if (strcmp(ex->props.field_name, "len") == 0) {
+                        da_append(e, 0x41);  // opcode for i32.const
+                        bb_append_leb128_u(
+                            &e,
+                            4);  // offset of .len from right (bytes)
+                        da_append(e, 0x6A);  // opcode for i32.add
+                    } else if (strcmp(ex->props.field_name, "ptr") == 0) {
+                        // nop
+                    } else {
+                        assert(false && "Invalid field on slice");
+                    }
+                } else {
+                    if (strcmp(ex->props.field_name, "len") == 0) {
+                        da_append(e, 0x42);  // opcode for i64.const
+                        bb_append_leb128_u(
+                            &e,
+                            32);             // offset of .len from right (bits)
+                        da_append(e, 0x88);  // opcode for i64.shr_u
+                        da_append(e, 0xA7);  // opcode for i32.wrap_i64
+                    } else if (strcmp(ex->props.field_name, "ptr") == 0) {
+                        da_append(e, 0xA7);  // opcode for i32.wrap_i64
+                    } else {
+                        assert(false && "Invalid field on slice");
+                    }
+                }
+            } else {
+                assert("Unimplemented");
+            }
+        } break;
     }
 
     return e;
@@ -600,9 +663,6 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
 ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
                                            size_t scope,
                                            ValueType* out_remaining_value) {
-    enum {
-        temp_index = -1,
-    };
     struct {
         da_list(size_t);
     } index_stack = {0};
@@ -612,12 +672,12 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
     ExprDecisions decisions = {0};
 
     for (size_t i = 0; i < expr->count; i++) {
-        ExprDecision decision = {0};
+        ExprDecision decision = {.dependency = -1};
         Expr* e = &expr->items[i];
 
         switch (e->kind) {
             case EK_INT_CONST: {
-                da_append(index_stack, temp_index);
+                da_append(index_stack, i);
                 ValueType vt = {
                     .kind = VT_INT,
                     .props.i.bits = e->props.i.bits,
@@ -626,11 +686,11 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
                 da_append(type_stack, vt);
             } break;
             case EK_BOOL_CONST: {
-                da_append(index_stack, temp_index);
+                da_append(index_stack, i);
                 da_append(type_stack, (ValueType){.kind = VT_BOOL});
             } break;
             case EK_STRING_CONST: {
-                da_append(index_stack, temp_index);
+                da_append(index_stack, i);
 
                 ValueType vt = {
                     .kind = VT_SLICE,
@@ -671,7 +731,7 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
                         index_stack.count -= 2;
                         type_stack.count -= 2;
 
-                        da_append(index_stack, temp_index);
+                        da_append(index_stack, i);
                         da_append(
                             type_stack,
                             decision.left_type);  // TODO maybe there should be
@@ -691,20 +751,27 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
                     case OP_EQUALITY: {
                         index_stack.count -= 2;
                         type_stack.count -= 2;
-                        da_append(index_stack, temp_index);
+                        da_append(index_stack, i);
                         da_append(type_stack, (ValueType){.kind = VT_BOOL});
                     } break;
                     case OP_ASSIGNEMENT: {
                         index_stack.count -= 2;
                         type_stack.count -= 2;
-                        if (li == temp_index) {
-                            assert(false && "Cannot assign to temporary value");
+                        {
+                            size_t it = li;
+                            do {
+                                decisions.items[it].take_reference = true;
+                            } while ((it = decisions.items[it].dependency) !=
+                                     -1);
                         }
-                        decisions.items[li].take_reference = true;
 
-                        da_append(index_stack, temp_index);
+                        da_append(index_stack, i);
                         da_append(type_stack, decision.left_type);
                     } break;
+
+                    case OP_FIELD_ACCESS:
+                        assert(false && "Unimplemented");
+                        break;
 
                     case OP_OPEN_PAREN:
                     case OP_FUNC_CALL:
@@ -739,9 +806,40 @@ ExprDecisions compute_expression_decisions(Module* mod, Expression* expr,
                 type_stack.count -= arity;
 
                 if (f->return_type.kind != VT_NIL) {
-                    da_append(index_stack, temp_index);
+                    da_append(index_stack, i);
                     da_append(type_stack, f->return_type);
                 }
+            } break;
+            case EK_FIELD_ACCESS: {
+                assert(type_stack.count > 0 &&
+                       "There has to be value of which a field is accessed");
+                ValueType object_type = type_stack.items[type_stack.count - 1];
+
+                if (object_type.kind != VT_SLICE)
+                    assert(false && "Unimplemented");
+
+                if (strcmp(e->props.field_name, "len") != 0 &&
+                    strcmp(e->props.field_name, "ptr") != 0)
+                    assert(false && "Unimplemented");
+
+                ValueType vt = {
+                    // u32 type
+                    .kind = VT_INT,
+                    .props.i.bits = 32,
+                    .props.i.unsign = true,
+                };
+                decision.dependency = index_stack.items[index_stack.count - 1];
+
+                decision.left_type = object_type;
+                decision.right_type = vt;
+
+                // remove parent object from stack
+                index_stack.count--;
+                type_stack.count--;
+
+                // push field object on stack
+                da_append(index_stack, i);
+                da_append(type_stack, vt);
             } break;
         }
         da_append(decisions, decision);
@@ -773,8 +871,8 @@ ByteBuffer codegen_expression(Module* mod, Expression* expr, size_t scope,
         compute_expression_decisions(mod, expr, scope, out_remaining_value);
     ByteBuffer out = {0};
     for (size_t i = 0; i < expr->count; i++) {
-        ByteBuffer e =
-            codegen_expr(mod, &expr->items[i], decisions.items[i], scope);
+        ByteBuffer e = codegen_expr(mod, &expr->items[i], decisions.items[i],
+                                    decisions, scope);
         bb_append_bb(&out, &e);
         free(e.items);
     }
@@ -878,6 +976,10 @@ Vec codegen_function_locals(Module* mod, Function* f) {
 
 ByteBuffer codegen_function_expr(Module* mod, Function* f) {
     ByteBuffer expr = codegen_statement(mod, &f->content, f->param_scope);
+
+    if (f->return_type.kind != VT_NIL)  // disable implicit return
+        da_append(expr, 0x00);          // opcode for unreachable
+
     da_append(expr, 0x0B);  // end opcode
     return expr;
 }
