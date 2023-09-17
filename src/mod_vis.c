@@ -1,6 +1,7 @@
 #include "mod_vis.h"
 
 #include <assert.h>
+#include <inttypes.h>
 #include <stdbool.h>
 
 typedef struct {
@@ -43,7 +44,7 @@ void visualize_expr(Expr* e, Visualizer* v) {
     switch (e->kind) {
         case EK_INT_CONST:
             vis_write_indent(v);
-            fprintf(v->file, "int_const %zi\n", e->props.i.value);
+            fprintf(v->file, "int_const %" PRId64 "\n", e->props.i.value);
             break;
         case EK_BOOL_CONST:
             vis_write_indent(v);

@@ -351,8 +351,9 @@ ByteBuffer codegen_expr(Module* mod, Expr* ex, ExprDecision decision,
             size_t ptr;
             assert(get_string_constant_offset(mod, ex->props.str_index, &ptr));
             size_t len = mod->string_constants.items[ex->props.str_index].len;
-            assert(ptr < (1LL << 32) && len < (1LL << 32));
-            size_t slice = (len << 32) | ptr;
+            if (sizeof(size_t) > 4)
+                assert(ptr < (1LL << 32) && len < (1LL << 32));
+            uint64_t slice = ((uint64_t)len << 32) | (uint64_t)ptr;
 
             da_append(e, 0x42);  // opcode for i64.const
             bb_append_leb128_u(&e, slice);
